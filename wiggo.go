@@ -14,6 +14,10 @@ const (
 	DT_PX ; DT_FR
 )
 
+func FloatStr[F constraints.Float](f F) string {
+	return strconv.FormatFloat(float64(f), 'f', 3, 32)
+}
+
 type Dimension struct {
 	Type       DIM_TYPE
 	// Logical size (px, fr, etc)
@@ -23,11 +27,33 @@ type Dimension struct {
 	IsResolved bool
 }
 
+func (d *Dimension) String() string {
+	res := "(unresolved)"
+	if d.IsResolved {
+		res = "(" + FloatStr(d.Real) + "px)"
+	}
+
+	switch d.Type {
+		case DT_AUTO: return "auto " + res
+		case DT_FR: return FloatStr(d.Amount) + "fr " + res
+		case DT_PX: return FloatStr(d.Amount) + "px"
+		default: panic("Unknown Dimension Type: " + strconv.Itoa(int(d.Type)))
+	}
+}
+
 func px(amount float32) Dimension { return Dimension{Type: DT_PX, Amount: amount} }
 func fr(amount float32) Dimension { return Dimension{Type: DT_FR, Amount: amount} }
-var Auto = Dimension{ Type: DT_AUTO }
+func Auto() Dimension {
+	return Dimension{ Type: DT_AUTO }
+}
 
 type Size struct { X, Y Dimension }
+
+func (s *Size) String() string {
+	x := s.X.String()
+	y := s.Y.String()
+	return "Size{ X: " + x + ", Y: " + y + " }"
+}
 
 type LAYOUT_TYPE uint8
 const (
@@ -36,6 +62,10 @@ const (
 )
 
 type V2 struct { X, Y float32 }
+
+func (v *V2) ManhattanLength() float32 {
+	return Abs(v.X) + Abs(v.Y)
+}
 
 type NodeData map[string] any
 
@@ -102,10 +132,10 @@ type Node struct {
 // could be used for object pooling later on.
 func GetNode(t string, parent *Node) *Node {
 	n := MakeNode(t, parent)
-	return &n
+	return n
 }
 
-func MakeNode(t string, parent *Node) Node {
+func MakeNode(t string, parent *Node) *Node {
 	n := Node{
 		Type: t,
 		Children: make([]*Node, 0),
@@ -114,9 +144,14 @@ func MakeNode(t string, parent *Node) Node {
 		UpdateFn: defaultUpdateFn,
 	}
 
-	n.UID = buildNodeUID(&n)
+	if n.Parent != nil {
+		n.Parent.Children = append(n.Parent.Children, &n)
+		n.UID = n.Parent.UID + "." + n.Type + strconv.Itoa(n.Parent.CountChildrenOfType(n.Type))
+	} else {
+		n.UID = n.Type
+	}
 
-	return n
+	return &n
 }
 
 func (n *Node) Get(key string, dflt any) any {
@@ -125,13 +160,6 @@ func (n *Node) Get(key string, dflt any) any {
 
 func (n *Node) Set(key string, val any) bool {
 	return uiDataSet(n, key, val)
-}
-
-func buildNodeUID(n *Node) string {
-	if n.Parent != nil {
-		return n.Parent.UID + "." + n.Type + strconv.Itoa(n.CountChildrenOfType(n.Type))
-	}
-	return n.Type
 }
 
 func defaultRenderFn(n *Node) {
@@ -165,6 +193,17 @@ func defaultUpdateFn(n *Node) {
 	}
 }
 
+func rootUpdateFn(n *Node) {
+	n.UpdateChildren()
+
+	if UI.Mode == IM_MOUSE {
+		if n.HasMouse() {
+			UI.SetActive(nil, false)
+			if MousePressed(sdl.BUTTON_LEFT) { UI.SetHot(nil, false) }
+		}
+	}
+}
+
 func (n *Node) CountChildrenOfType(t string) int {
 	count := 0
 	for _, child := range n.Children {
@@ -179,7 +218,7 @@ func (n *Node) Render() {
 }
 
 func (n *Node) ParentWidth() float32 {
-	if n.Parent != nil {
+	if n.Parent == nil {
 		return WindowWidth()
 	} else {
 		if n.Parent.Size.X.IsResolved {
@@ -191,7 +230,7 @@ func (n *Node) ParentWidth() float32 {
 }
 
 func (n *Node) ParentHeight() float32 {
-	if n.Parent != nil {
+	if n.Parent == nil {
 		return WindowHeight()
 	} else {
 		if n.Parent.Size.Y.IsResolved {
@@ -221,9 +260,13 @@ func (n *Node) setResolvedHeight(height float32) float32 {
 }
 
 func (n *Node) ResolveWidth(parent_width float32) float32 {
-	if n.Size.X.IsResolved { return n.Size.X.Real }
+	if n.Size.X.IsResolved {
+		return n.Size.X.Real
+	}
 
-	if n.Type == "root" { return n.setResolvedWidth(WindowWidth()) }
+	if n.Type == "root" {
+		return n.setResolvedWidth(WindowWidth())
+	}
 
 	switch (n.Size.X.Type) {
 
@@ -480,6 +523,81 @@ func (ui *ui_state) SetHot(node *Node, force bool) {
 	ui.ActiveChanged = true
 }
 
+func (ui *ui_state) Begin() {
+	ui.Reset()
+	ui.Root = GetNode("root", nil)
+	ui.Root.UpdateFn = rootUpdateFn;
+	ui.Current = ui.Root
+}
+
+func (ui *ui_state) End() {
+	if ui.Current != ui.Root {
+		panic("Unbalanced UI stack!")
+	}
+	ui.Root.ResolveSize()
+	ui.Root.ResolvePos()
+
+	if Platform.MouseDelta.ManhattanLength() > 5 { ui.Mode = IM_MOUSE }
+	if Platform.AnyKeyPressed { ui.Mode = IM_KBD }
+
+	ui.Root.UpdateFn(ui.Root)
+}
+
+func (ui *ui_state) Render() {
+	ui.Root.Render()
+}
+
+func WithNewNode(t string, fn func(*Node)) {
+	n := UI.Push(t)
+	fn(n)
+	UI.Pop(n)
+}
+
+func WithNode(n *Node, fn func(*Node)) {
+	fn(n)
+	UI.Pop(n)
+}
+
+func Row() *Node {
+	n := UI.Push("row")
+	n.Layout = LT_HORIZONTAL
+	return n
+}
+
+func Column() *Node {
+	n := UI.Push("column")
+	n.Layout = LT_VERTICAL
+	return n
+}
+
+func textRenderFn(n *Node) {
+	t, ok := n.Get("text", "").(string)
+	if !ok { t = "" }
+
+	// r,g,b,a,_ := Platform.Renderer.GetDrawColor()
+	// defer Platform.Renderer.SetDrawColor(r, g, b, a)
+	// Platform.Renderer.SetDrawColor(0, 0, 0, 255)
+
+	surf, _ := Platform.Font.RenderUTF8Blended(t, sdl.Color{255, 255, 255, 255})
+	defer surf.Free()
+
+	tex, _ := Platform.Renderer.CreateTextureFromSurface(surf)
+	defer tex.Destroy()
+
+	Platform.Renderer.CopyF(tex, nil, &sdl.FRect{n.Pos.X, n.Pos.Y, n.Size.X.Real, n.Size.Y.Real})
+}
+
+func Text(text string) {
+	n := UI.Push("text")
+	defer UI.Pop(n)
+
+	n.Set("text", text)
+	n.Size.X = Auto()
+	n.Size.Y = Auto()
+
+	n.RenderFn = textRenderFn;
+}
+
 type BUTTON_STATE uint8
 const (
 	BS_UP BUTTON_STATE = iota
@@ -494,7 +612,9 @@ type platform struct {
 	Font *ttf.Font
 	Mouse map[uint8]BUTTON_STATE
 	MousePos V2
+	MouseDelta V2
 	Keyboard map[uint32]BUTTON_STATE
+	AnyKeyPressed bool
 }
 
 var Platform platform
@@ -514,6 +634,8 @@ func (p *platform) Init() {
 	p.Font = font
 	p.Mouse = make(map[uint8]BUTTON_STATE)
 	p.Keyboard = make(map[uint32]BUTTON_STATE)
+	p.MousePos.X = -1
+	p.MousePos.Y = -1
 }
 
 func (p *platform) Cleanup() {
@@ -593,6 +715,10 @@ func Min[A constraints.Ordered](a, b A) A {
 	if a < b { return a } else { return b }
 }
 
+func Abs[A constraints.Float | constraints.Integer](a A) A {
+	if a < 0 { return -a } else { return a }
+}
+
 func Btof(b bool) float32 {
 	if b { return 1 } else { return 0 }
 }
@@ -613,6 +739,7 @@ func main() {
 	defer ttf.Quit()
 
 	Platform.Init()
+	UI.Init()
 
 	// Platform.Surface.FillRect(nil, 0)
 	// rect := sdl.Rect{0, 0, 200, 200}
@@ -629,6 +756,9 @@ func main() {
 
 		ButtonMapUpdate(Platform.Keyboard)
 		ButtonMapUpdate(Platform.Mouse)
+		Platform.AnyKeyPressed = false
+		Platform.MouseDelta.X = 0
+		Platform.MouseDelta.Y = 0
 
 		for event := sdl.PollEvent() ; event != nil ; event = sdl.PollEvent() {
 			switch e := event.(type) {
@@ -645,19 +775,44 @@ func main() {
 			case *sdl.MouseMotionEvent:
 				Platform.MousePos.X = float32(e.X)
 				Platform.MousePos.Y = float32(e.Y)
+				Platform.MouseDelta.X += float32(e.XRel)
+				Platform.MouseDelta.Y += float32(e.YRel)
 
 			case *sdl.KeyboardEvent:
 				if e.Type == sdl.KEYDOWN {
 					Platform.Keyboard[uint32(e.Keysym.Scancode)] = BS_PRESSED
+					Platform.AnyKeyPressed = true
 				} else {
 					Platform.Keyboard[uint32(e.Keysym.Scancode)] = BS_RELEASED
 				}
 
 			case *sdl.QuitEvent:
-				println("Quit")
 				running = false
 				break
 			}
 		}
+
+		Platform.Renderer.SetDrawColor(255, 255, 255, 255)
+		Platform.Renderer.Clear()
+
+		Platform.Renderer.SetDrawColor(255, 0, 0, 255)
+		UI.Begin(); {
+			WithNewNode("div", func(n *Node){
+				n.Flags.Focusable = true
+				n.Size.X = px(100)
+				n.Size.Y = px(100)
+				Text("Hello")
+			})
+			WithNewNode("div", func(n *Node){
+				n.Flags.Focusable = true
+				n.Size.X = px(100)
+				n.Size.Y = px(100)
+				Text("World")
+			})
+		} ; UI.End()
+
+		UI.Render()
+
+		Platform.Renderer.Present()
 	}
 }
