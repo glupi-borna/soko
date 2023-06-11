@@ -3,6 +3,7 @@ package main
 import (
 	"runtime"
 	"strconv"
+	"math"
 	"golang.org/x/exp/constraints"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
@@ -77,8 +78,9 @@ func StyleVars[K any](norm, hov K) StyleVariant[K] {
 }
 
 type Style struct {
-	Foreground StyleVariant[sdl.Color]
-	Background StyleVariant[sdl.Color]
+	Foreground   StyleVariant[sdl.Color]
+	Background   StyleVariant[sdl.Color]
+	CornerRadius StyleVariant[float32]
 }
 
 var DefaultStyle = Style{
@@ -89,6 +91,10 @@ var DefaultStyle = Style{
 	Background: StyleVariant[sdl.Color]{
 		Normal: sdl.Color{},
 		Hovered: sdl.Color{255, 255, 0, 100},
+	},
+	CornerRadius: StyleVariant[float32]{
+		Normal: 3,
+		Hovered: 3,
 	},
 }
 
@@ -137,6 +143,20 @@ func uiDataSet(n *Node, key string, val any) bool {
 	old := data[key]
 	data[key] = val
 	return old != val
+}
+
+var animState = map[string]float32 {}
+
+// Smoothly animates a value
+func Animate(val float32, id string) float32 {
+	old, ok := animState[id]
+	if !ok {
+		animState[id] = val
+		return val
+	}
+	new := old + 0.5 * (val-old)
+	animState[id] = new
+	return new
 }
 
 type NodeFlags struct {
@@ -221,13 +241,19 @@ func defaultRenderFn(n *Node) {
 
 	if UI.Active == n.UID {
 		SetColor(s.Background.Hovered)
-		DrawRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+		if s.CornerRadius.Hovered == 0 {
+			DrawRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+		} else {
+			DrawRoundRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y, s.CornerRadius.Hovered)
+		}
 	} else {
 		SetColor(s.Background.Normal)
+		if s.CornerRadius.Hovered == 0 {
+			DrawRectOutlined(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+		} else {
+			DrawRoundRectOutlined(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y, s.CornerRadius.Normal)
+		}
 	}
-
-	DrawRectOutlined(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
-	DrawRectOutlined(n.Pos.X+8, n.Pos.Y+8, n.RealSize.X-16, n.RealSize.Y-16)
 }
 
 func defaultUpdateFn(n *Node) {
@@ -646,11 +672,11 @@ func (ui *ui_state) SetActive(node *Node, force bool) {
 func (ui *ui_state) SetHot(node *Node, force bool) {
 	if ui.HotChanged && !force { return }
 	if node == nil {
-		ui.Active = ""
+		ui.Hot = ""
 	} else {
-		ui.Active = node.UID
+		ui.Hot = node.UID
 	}
-	ui.ActiveChanged = true
+	ui.HotChanged = true
 }
 
 func (ui *ui_state) Begin() {
@@ -706,10 +732,6 @@ func Column() *Node {
 func textRenderFn(n *Node) {
 	t := uiGet(n, "text", "")
 	s := n.GetStyle()
-
-	// r,g,b,a,_ := Platform.Renderer.GetDrawColor()
-	// defer Platform.Renderer.SetDrawColor(r, g, b, a)
-	// Platform.Renderer.SetDrawColor(0, 0, 0, 255)
 
 	var c sdl.Color
 	if UI.Active == n.UID || n.IsChildOfUID(UI.Active) {
@@ -814,9 +836,16 @@ const (
 )
 
 func (p *platform) Init() {
+	var window_flags uint32 =
+		sdl.WINDOW_SHOWN |
+		sdl.WINDOW_BORDERLESS |
+		sdl.WINDOW_UTILITY |
+		sdl.WINDOW_ALWAYS_ON_TOP
+
+	sdl.GLSetAttribute(sdl.GL_MULTISAMPLESAMPLES, 4)
 	window, err := sdl.CreateWindow(
 		"", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		800, 600, sdl.WINDOW_SHOWN)
+		800, 600, window_flags)
 	die(err)
 	p.Window = window
 
@@ -845,6 +874,89 @@ func DrawRectOutlined(x, y, w, h float32) {
 
 func DrawRectFilled(x, y, w, h float32) {
 	Platform.Renderer.FillRectF(&sdl.FRect{x, y, w, h})
+}
+
+func ArcPoints(x, y, r, startAngle, endAngle float32) []sdl.FPoint {
+	CORNER_POINTS := Max(5, int(r)/5)
+
+	points := make([]sdl.FPoint, CORNER_POINTS)
+	angleRange := float64(Abs(startAngle - endAngle))
+	start := float64(startAngle)
+	rad := float64(r)
+
+	imax := float64(CORNER_POINTS-1)
+
+	for i:= 0; i<CORNER_POINTS; i++ {
+		frac := float64(i)/imax
+		angle := frac*angleRange + start
+		xoff := float32(math.Cos(angle) * rad)
+		yoff := float32(math.Sin(angle) * rad)
+		points[i].X = x+xoff
+		points[i].Y = y+yoff
+	}
+
+	return points
+}
+
+func RoundRectPoints(x, y, w, h, r float32) []sdl.FPoint {
+	r = Clamp(r, 0, Min(w/2, h/2))
+
+	CORNER_POINTS := Max(5, int(r)/5)
+	TOTAL_POINTS := CORNER_POINTS * 4
+
+	x1 := x+r
+	y1 := y+r
+	x2 := x+w-r
+	y2 := y+h-r
+
+	points := make([]sdl.FPoint, 0, TOTAL_POINTS)
+	const pihalf = math.Pi/2
+	points = append(points, ArcPoints(x1, y1, r, pihalf*2, pihalf*3)...)
+	points = append(points, ArcPoints(x2, y1, r, pihalf*3, pihalf*4)...)
+	points = append(points, ArcPoints(x2, y2, r, 0,        pihalf)...)
+	points = append(points, ArcPoints(x1, y2, r, pihalf,   pihalf*2)...)
+
+	return points
+}
+
+func DrawPoints(pts []sdl.FPoint) {
+	Platform.Renderer.DrawPointsF(pts)
+}
+
+func DrawRoundRectOutlined(x, y, w, h, r float32) {
+	points := RoundRectPoints(x, y, w, h, r)
+	Platform.Renderer.DrawLinesF(points)
+	l := len(points)-1
+	Platform.Renderer.DrawLineF(points[0].X, points[0].Y, points[l].X, points[l].Y)
+}
+
+func DrawRoundRectFilled(x, y, w, h, r float32) {
+	R,G,B,A,_ := Platform.Renderer.GetDrawColor()
+	c := sdl.Color{R,G,B,A}
+
+	points := RoundRectPoints(x, y, w, h, r)
+	point_count := len(points)
+
+	verts := make([]sdl.Vertex, point_count*3)
+	for i := range verts { verts[i] = sdl.Vertex{Color: c} }
+
+	midx := x+w/2
+	midy := y+h/2
+
+	for i:=0 ; i<point_count ; i++ {
+		idx := i*3
+		verts[idx].Position.X = points[i].X
+		verts[idx].Position.Y = points[i].Y
+
+		verts[idx+1].Position.X = midx
+		verts[idx+1].Position.Y = midy
+
+		next_i := (i+1)%point_count
+		verts[idx+2].Position.X = points[next_i].X
+		verts[idx+2].Position.Y = points[next_i].Y
+	}
+
+	Platform.Renderer.RenderGeometry(nil, verts, nil)
 }
 
 func KeyboardPressed(key uint32) bool {
@@ -1003,6 +1115,13 @@ func main() {
 		Platform.Renderer.Clear()
 
 		Platform.Renderer.SetDrawColor(255, 0, 0, 255)
+
+		ButtonStyle := DefaultStyle
+		ButtonStyle.CornerRadius.Normal = 3
+		ButtonStyle.CornerRadius.Hovered = 3
+		ButtonStyle.Background.Normal = sdl.Color{255, 255, 255, 255}
+		ButtonStyle.Background.Hovered = sdl.Color{0, 0, 255, 255}
+
 		UI.Begin(); {
 			Text(FloatStr(float64(FrameTime)/1000) + "ms")
 			WithNode(Row(), func(n *Node) {
@@ -1011,6 +1130,9 @@ func main() {
 
 				Margin(px(8), WithNode(Column(), func(n *Node) {
 					n.Flags.Focusable = true
+					n.Style = &ButtonStyle
+					n.Size.W = px(100)
+					n.Size.H = px(100)
 					n.Size.H = child_sum()
 					Text("This")
 					Text("stacks")
@@ -1018,8 +1140,10 @@ func main() {
 				}))
 
 				Text("1").Size.W = fr(1)
-				Text("2").Size.W = fr(2)
-				Text("1").Size.W = fr(1)
+
+				Seconds := FrameStart / 1000
+				Text("2").Size.W = fr(Animate(float32(Seconds % 2 + 1), "1"))
+				Text("1").Size.W = fr(Animate(float32(Seconds % 3 + 1), "2"))
 				Text("Some more")
 			})
 		} ; UI.End()
