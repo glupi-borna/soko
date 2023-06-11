@@ -63,9 +63,33 @@ func (v *V2) String() string {
 	return "V2{ " + FloatStr(v.X) + ", " + FloatStr(v.Y) + " }"
 }
 
+type StyleVariant[K any] struct {
+	Normal  K
+	Hovered K
+}
+
+func StyleVar[K any](val K) StyleVariant[K] {
+	return StyleVariant[K]{ Normal: val, Hovered: val }
+}
+
+func StyleVars[K any](norm, hov K) StyleVariant[K] {
+	return StyleVariant[K]{ Normal: norm, Hovered: hov }
+}
+
 type Style struct {
-	Foreground sdl.Color
-	Background sdl.Color
+	Foreground StyleVariant[sdl.Color]
+	Background StyleVariant[sdl.Color]
+}
+
+var DefaultStyle = Style{
+	Foreground: StyleVariant[sdl.Color]{
+		Normal: sdl.Color{255, 255, 255, 255},
+		Hovered: sdl.Color{255, 0, 0, 255},
+	},
+	Background: StyleVariant[sdl.Color]{
+		Normal: sdl.Color{},
+		Hovered: sdl.Color{255, 255, 0, 100},
+	},
 }
 
 type NodeData map[string] any
@@ -120,17 +144,17 @@ type NodeFlags struct {
 }
 
 type Node struct {
-	// Unique ID for this Node
-	UID       string
-	// Equivalent to tag name in HTML
-	Type      string
-	Layout    LAYOUT_TYPE
+	UID       string // Unique ID of this Node
+	Type      string // Equivalent to tag name in HTML
+	Layout    LAYOUT_TYPE // Children positioning (horizontal/vertical)
 	Flags     NodeFlags
-	Parent    *Node
+	Parent    *Node // Parent of this node - null if the node is the root node, or is detached.
 	Children  []*Node
+	Style     *Style
 
 	// Semantic size
-	Size      Size
+	Size Size
+
 
 	// Calculated position
 	Pos       V2
@@ -188,10 +212,20 @@ func (n *Node) Set(key string, val any) bool {
 	return uiDataSet(n, key, val)
 }
 
+func SetColor(c sdl.Color) {
+	Platform.Renderer.SetDrawColor(c.R, c.G, c.B, c.A)
+}
+
 func defaultRenderFn(n *Node) {
+	s := n.GetStyle()
+
 	if UI.Active == n.UID {
+		SetColor(s.Background.Hovered)
 		DrawRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+	} else {
+		SetColor(s.Background.Normal)
 	}
+
 	DrawRectOutlined(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
 	DrawRectOutlined(n.Pos.X+8, n.Pos.Y+8, n.RealSize.X-16, n.RealSize.Y-16)
 }
@@ -248,6 +282,12 @@ func (n *Node) Render() {
 
 	n.RenderFn(n)
 	for _, child := range n.Children { child.Render() }
+}
+
+func (n *Node) GetStyle() *Style {
+	if n.Style != nil { return n.Style }
+	if n.Parent != nil { return n.Parent.GetStyle() }
+	return &DefaultStyle
 }
 
 func (n *Node) xFracs() float32 {
@@ -533,6 +573,15 @@ func (n *Node) HasMouse() bool {
 		my <= y2)
 }
 
+func (n *Node) IsChildOfUID(uid string) bool {
+	p := n.Parent
+	for p != nil {
+		if p.UID == uid { return true }
+		p = p.Parent
+	}
+	return false
+}
+
 func (n *Node) Index() int {
 	if n.Parent == nil { return -1 }
 	for idx, child := range n.Parent.Children {
@@ -619,6 +668,7 @@ func (ui *ui_state) End() {
 		panic("Unbalanced UI stack!")
 	}
 
+	ui.Root.Style = &DefaultStyle
 	ui.Root.ResolveStandalone()
 	ui.Root.ResolveUpwards()
 	ui.Root.ResolveDownwards()
@@ -655,12 +705,20 @@ func Column() *Node {
 
 func textRenderFn(n *Node) {
 	t := uiGet(n, "text", "")
+	s := n.GetStyle()
 
 	// r,g,b,a,_ := Platform.Renderer.GetDrawColor()
 	// defer Platform.Renderer.SetDrawColor(r, g, b, a)
 	// Platform.Renderer.SetDrawColor(0, 0, 0, 255)
 
-	surf, _ := Platform.Font.RenderUTF8Blended(t, sdl.Color{255, 255, 255, 255})
+	var c sdl.Color
+	if UI.Active == n.UID || n.IsChildOfUID(UI.Active) {
+		c = s.Foreground.Hovered
+	} else {
+		c = s.Foreground.Normal
+	}
+
+	surf, _ := Platform.Font.RenderUTF8Blended(t, c)
 	defer surf.Free()
 
 	tex, _ := Platform.Renderer.CreateTextureFromSurface(surf)
