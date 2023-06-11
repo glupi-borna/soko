@@ -11,7 +11,7 @@ import (
 type DIM_TYPE uint8
 const (
 	DT_AUTO DIM_TYPE = iota
-	DT_PX ; DT_FR
+	DT_PX ; DT_FR ; DT_TEXT ; DT_CHILDREN ; DT_SKIP
 )
 
 func FloatStr[F constraints.Float](f F) string {
@@ -21,20 +21,12 @@ func FloatStr[F constraints.Float](f F) string {
 type Dimension struct {
 	Type       DIM_TYPE
 	Amount     float32
-	Real       float32
-}
-
-func (d *Dimension) FracPX(fracsize float32) float32 {
-	if d.Type != DT_FR { return 0 }
-	d.Real = 0
-	if d.Amount <= 0 { return 0 }
-	d.Real = d.Amount * fracsize
-	return d.Real
 }
 
 func (d *Dimension) String() string {
 	switch d.Type {
-		case DT_AUTO: return "auto"
+		case DT_CHILDREN: return "children"
+		case DT_TEXT: return "text"
 		case DT_FR: return FloatStr(d.Amount) + "fr"
 		case DT_PX: return FloatStr(d.Amount) + "px"
 		default: panic("Unknown Dimension Type: " + strconv.Itoa(int(d.Type)))
@@ -43,108 +35,16 @@ func (d *Dimension) String() string {
 
 func px(amount float32) Dimension { return Dimension{Type: DT_PX, Amount: amount} }
 func fr(amount float32) Dimension { return Dimension{Type: DT_FR, Amount: amount} }
+func child_sum() Dimension { return Dimension{ Type: DT_CHILDREN }}
+func fit_text() Dimension { return Dimension{ Type: DT_TEXT }}
 func Auto() Dimension { return Dimension{ Type: DT_AUTO } }
 
-type Size struct {
-	W, H Dimension
-	Padding Padding
-	IsResolved bool
-	Real V2
-}
-
-// The sum of the static parts of this Size:
-// - width (if defined in pixels)
-// - width of the left padding (if defined in pixels)
-// - width of the right padding (if defined in pixels)
-func (s *Size) StaticWidth() float32 {
-	var w float32 = 0
-	if s.W.Type == DT_PX { w += s.W.Amount ; s.W.Real = s.W.Amount }
-	if s.Padding.Right.Type == DT_PX { w += s.Padding.Right.Amount ; s.Padding.Right.Real = s.Padding.Right.Amount }
-	if s.Padding.Left.Type == DT_PX { w += s.Padding.Left.Amount ; s.Padding.Left.Real = s.Padding.Left.Amount }
-	return w
-}
-
-// The sum of the static parts of this Size:
-// - height (if defined in pixels)
-// - height of the top padding (if defined in pixels)
-// - height of the bottom padding (if defined in pixels)
-func (s *Size) StaticHeight() float32 {
-	var h float32 = 0
-	if s.H.Type == DT_PX { h += s.H.Amount ; s.H.Real = s.H.Amount }
-	if s.Padding.Top.Type == DT_PX { h += s.Padding.Top.Amount ; s.Padding.Top.Real = s.Padding.Top.Amount }
-	if s.Padding.Bottom.Type == DT_PX { h += s.Padding.Bottom.Amount ; s.Padding.Bottom.Real = s.Padding.Bottom.Amount }
-	return h
-}
-
-// The sum of the dynamic parts of a node's size:
-// - width of the node (if defined in fractions)
-// - width of the left padding (if defined in fractions)
-// - width of the right padding (if defined in fractions)
-// This requires a Node to be passed in because the width
-// of a single fraction depends on the total count of
-// fractions defined in the widths of that Node's siblings.
-func (s *Size) DynamicWidth(n *Node) float32 {
-	fw := n.FracWidth()
-	return s.W.FracPX(fw) + s.Padding.Right.FracPX(fw) + s.Padding.Left.FracPX(fw)
-}
-
-// The sum of the dynamic parts of a node's size:
-// - height of the node (if defined in fractions)
-// - height of the top padding (if defined in fractions)
-// - height of the bottom padding (if defined in fractions)
-// This requires a Node to be passed in because the height
-// of a single fraction depends on the total count of
-// fractions defined in the heights of that Node's siblings.
-func (s *Size) DynamicHeight(n *Node) float32 {
-	fh := n.FracHeight()
-	return s.H.FracPX(fh) + s.Padding.Top.FracPX(fh) + s.Padding.Bottom.FracPX(fh)
-}
-
-// Returns the node's resolved size in pixels
-func (s *Size) Resolved(n *Node) V2 {
-	if s.IsResolved { return s.Real }
-
-	var w float32 = n.Size.StaticWidth() + n.Size.DynamicWidth(n)
-	var h float32 = n.Size.StaticHeight() + n.Size.DynamicHeight(n)
-
-	text := ""
-	if n.Type == "text" {
-		ok := false
-		text, ok = n.Get("text", "").(string)
-		if !ok { text = "" }
-	}
-
-	if n.Size.W.Type == DT_AUTO {
-		if n.Type == "text" {
-			w += Min(TextWidth(text), n.ParentWidth())
-		} else {
-			w += n.ChildrenWidth()
-		}
-	}
-
-	if n.Size.H.Type == DT_AUTO {
-		if n.Type == "text" {
-			h += TextHeightWrapped(text, n.ParentHeight())
-		} else {
-			h += n.ChildrenHeight()
-		}
-	}
-
-	s.Real.X = w
-	s.Real.Y = h
-	s.IsResolved = true
-
-	return s.Real
-}
+type Size struct { W, H Dimension }
 
 func (s *Size) String() string {
 	x := s.W.String()
 	y := s.H.String()
 	return "Size{ W: " + x + ", H: " + y + " }"
-}
-
-type Padding struct {
-	Top, Right, Bottom, Left Dimension
 }
 
 type LAYOUT_TYPE uint8
@@ -172,20 +72,32 @@ type NodeData map[string] any
 
 var UI_Data = make(map[string]NodeData)
 
-func uiDataGet(n *Node, key string, dflt any) any {
+func uiGet[K any](n *Node, key string, dflt K) K {
 	data, ok := UI_Data[n.UID]
+
+	// If node data doesn't exist
 	if !ok {
 		data = make(NodeData)
 		UI_Data[n.UID] = data
 		data[key] = dflt
 		return dflt
 	}
+
+	// If key does not exist in node data
 	val, ok := data[key]
 	if !ok {
 		data[key] = dflt
 		return dflt
 	}
-	return val
+
+	// If key is wrong type
+	out, ok := val.(K)
+	if !ok {
+		data[key] = dflt
+		return dflt
+	}
+
+	return out
 }
 
 // Sets data for this node.
@@ -215,17 +127,27 @@ type Node struct {
 	Layout    LAYOUT_TYPE
 	Flags     NodeFlags
 	Parent    *Node
-	// Logical size
+	Children  []*Node
+
+	// Semantic size
 	Size      Size
 
-	Children  []*Node
-	// Real position (in pixels)
+	// Calculated position
 	Pos       V2
+	// Calculated size
+	RealSize  V2
 
+	// Is RealSize.X calculated for this frame
+	IsWidthResolved bool
+	// Is RealSize.Y calculated for this frame
+	IsHeightResolved bool
 
 	// Called after the position and size of the Node
 	// have been resolved.
 	RenderFn func(*Node)
+
+	// Called after the position and size of the Node
+	// have been resolved.
 	UpdateFn func(*Node)
 }
 
@@ -234,6 +156,14 @@ type Node struct {
 func GetNode(t string, parent *Node) *Node {
 	n := MakeNode(t, parent)
 	return n
+}
+
+func buildNodeUID(n *Node) string {
+	if n.Parent != nil {
+		return n.Parent.UID + "." + n.Type + strconv.Itoa(n.Parent.CountChildrenOfType(n.Type))
+	} else {
+		return n.Type
+	}
 }
 
 func MakeNode(t string, parent *Node) *Node {
@@ -247,16 +177,11 @@ func MakeNode(t string, parent *Node) *Node {
 
 	if n.Parent != nil {
 		n.Parent.Children = append(n.Parent.Children, &n)
-		n.UID = n.Parent.UID + "." + n.Type + strconv.Itoa(n.Parent.CountChildrenOfType(n.Type))
-	} else {
-		n.UID = n.Type
 	}
 
-	return &n
-}
+	n.UID = buildNodeUID(&n)
 
-func (n *Node) Get(key string, dflt any) any {
-	return uiDataGet(n, key, dflt)
+	return &n
 }
 
 func (n *Node) Set(key string, val any) bool {
@@ -265,14 +190,10 @@ func (n *Node) Set(key string, val any) bool {
 
 func defaultRenderFn(n *Node) {
 	if UI.Active == n.UID {
-		DrawRectFilled(n.Pos.X, n.Pos.Y, n.Size.Real.X, n.Size.Real.Y)
+		DrawRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
 	}
-	DrawRectOutlined(n.Pos.X, n.Pos.Y, n.Size.Real.X, n.Size.Real.Y)
-
-	// println(n.UID)
-	// println("  pos ", n.Pos.String())
-	// println("  size", n.Size.Real.String())
-	// println("  res ", n.Size.IsResolved)
+	DrawRectOutlined(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+	DrawRectOutlined(n.Pos.X+8, n.Pos.Y+8, n.RealSize.X-16, n.RealSize.Y-16)
 }
 
 func defaultUpdateFn(n *Node) {
@@ -319,175 +240,260 @@ func (n *Node) CountChildrenOfType(t string) int {
 }
 
 func (n *Node) Render() {
+	// println(n.UID)
+	// println("  pos ", n.Pos.String())
+	// println("  size", n.RealSize.String())
+	// println("  sem ", n.Size.String())
+	// println("  res ", n.IsWidthResolved, n.IsHeightResolved)
+
 	n.RenderFn(n)
 	for _, child := range n.Children { child.Render() }
 }
 
-func (n *Node) StaticWidth() float32 {
-	var w float32 = 0
-
-	if n.Layout == LT_HORIZONTAL {
-		for _, child := range n.Children {
-			w += child.Size.StaticWidth()
-		}
-
-	} else if n.Layout == LT_VERTICAL {
-		for _, child := range n.Children {
-			cw := child.Size.StaticWidth()
-			if cw > w { w = cw }
-		}
-	}
-
-	return w
-}
-
-func (n *Node) StaticHeight() float32 {
-	var h float32 = 0
-
-	if n.Layout == LT_HORIZONTAL {
-		for _, child := range n.Children {
-			ch := child.Size.StaticHeight()
-			if ch > h { h = ch }
-		}
-
-	} else if n.Layout == LT_VERTICAL {
-		for _, child := range n.Children {
-			h += child.Size.StaticHeight()
-		}
-	}
-
-	return h
-}
-
-func (n *Node) ChildrenWidth() float32 {
-	var w float32 = 0
-
-	if n.Layout == LT_HORIZONTAL {
-		for _, child := range n.Children {
-			w += child.Size.Resolved(child).X
-		}
-
-	} else if n.Layout == LT_VERTICAL {
-		for _, child := range n.Children {
-			cw := child.Size.Resolved(child).X
-			if cw > w { w = cw }
-		}
-	}
-
-	return w
-}
-
-func (n *Node) ChildrenHeight() float32 {
-	var h float32 = 0
-
-	if n.Layout == LT_HORIZONTAL {
-		for _, child := range n.Children {
-			ch := child.Size.Resolved(child).Y
-			if ch > h { h = ch }
-		}
-
-	} else if n.Layout == LT_VERTICAL {
-		for _, child := range n.Children {
-			h += child.Size.Resolved(child).Y
-		}
-	}
-
-	return h
-}
-
-func (n *Node) ParentWidth() float32 {
-	if n.Parent == nil {
-		return WindowWidth()
-	} else {
-		if n.Parent.Size.IsResolved {
-			return n.Parent.Size.Real.X
-		} else {
-			return n.Parent.ParentWidth()
-		}
-	}
-}
-
-func (n *Node) ParentHeight() float32 {
-	if n.Parent == nil {
-		return WindowHeight()
-	} else {
-		if n.Parent.Size.IsResolved {
-			return n.Parent.Size.Real.Y
-		} else {
-			return n.Parent.ParentHeight()
-		}
-	}
-}
-
 func (n *Node) xFracs() float32 {
-	var fracs float32 = 0
+	if n.Layout == LT_VERTICAL { return 1 }
+
+	var count float32 = 0
 	for _, child := range n.Children {
-		if child.Size.W.Type == DT_FR {
-			fracs += child.Size.W.Amount
-		}
-
-		if child.Size.Padding.Right.Type == DT_FR {
-			fracs += child.Size.Padding.Right.Amount
-		}
-
-		if child.Size.Padding.Left.Type == DT_FR {
-			fracs += child.Size.Padding.Left.Amount
-		}
+		cw := child.Size.W
+		if cw.Type == DT_FR { count += cw.Amount }
 	}
-	return fracs
+	return count
 }
 
 func (n *Node) yFracs() float32 {
-	var fracs float32 = 0
+	if n.Layout == LT_HORIZONTAL { return 1 }
+
+	var count float32 = 0
 	for _, child := range n.Children {
-		if child.Size.H.Type == DT_FR {
-			fracs += child.Size.H.Amount
-		}
-
-		if child.Size.Padding.Top.Type == DT_FR {
-			fracs += child.Size.Padding.Top.Amount
-		}
-
-		if child.Size.Padding.Bottom.Type == DT_FR {
-			fracs += child.Size.Padding.Bottom.Amount
-		}
+		ch := child.Size.H
+		if ch.Type == DT_FR { count += ch.Amount }
 	}
-	return fracs
+	return count
 }
 
-func (n *Node) FracWidth() float32 {
-	var psw float32 = 0
-	var xfracs float32 = 0
-
-	if n.Parent != nil {
-		psw = n.Parent.StaticWidth()
-		xfracs = n.Parent.xFracs()
-	}
-
-	usable_width := n.ParentWidth() - psw
-	var fracw float32 = 0
-	if xfracs > 0 { fracw = usable_width / xfracs }
-	return fracw
+var autoMap = map[string]Dimension{
+	"text": fit_text(),
 }
 
-func (n *Node) FracHeight() float32 {
-	var psh float32 = 0
-	var yfracs float32 = 0
-
-	if n.Parent != nil {
-		psh = n.Parent.StaticHeight()
-		yfracs = n.Parent.yFracs()
+func ResolveAuto(n *Node) {
+	if n.Size.W.Type == DT_AUTO {
+		dim, ok := autoMap[n.Type]
+		if !ok {
+			n.Size.W = child_sum()
+		} else {
+			n.Size.W = dim
+		}
 	}
 
-	usable_height := n.ParentHeight() - psh
-	var frach float32 = 0
-	if yfracs > 0 { frach = usable_height / yfracs }
-	return frach
+	if n.Size.H.Type == DT_AUTO {
+		dim, ok := autoMap[n.Type]
+		if !ok {
+			n.Size.H = child_sum()
+		} else {
+			n.Size.H = dim
+		}
+	}
 }
 
-func (n *Node) ResolveSize() {
-	if !n.Size.IsResolved { n.Size.Resolved(n) }
-	for _, child := range n.Children { child.ResolveSize() }
+// Resolves standalone sizes
+func (n *Node) ResolveStandalone() {
+	ResolveAuto(n)
+
+	if n.Size.W.Type == DT_PX {
+		n.RealSize.X = n.Size.W.Amount
+		n.IsWidthResolved = true
+
+	} else if n.Size.W.Type == DT_TEXT {
+		t := uiGet(n, "text", "")
+		n.RealSize.X = TextWidth(t)
+		n.IsWidthResolved = true
+	}
+
+	if n.Size.H.Type == DT_PX {
+		n.RealSize.Y = n.Size.H.Amount
+		n.IsHeightResolved = true
+
+	} else if n.Size.H.Type == DT_TEXT {
+		t := uiGet(n, "text", "")
+		n.RealSize.Y = TextHeight(t)
+		n.IsHeightResolved = true
+	}
+
+	for _, child := range n.Children {
+		child.ResolveStandalone()
+	}
+}
+
+// Resolves upwards-dependent sizes
+func (n *Node) ResolveUpwards() {
+	if !n.IsWidthResolved && n.Size.W.Type == DT_FR {
+		pw := n.ParentRemainingWidth()
+		fracs := n.Parent.xFracs()
+		fracw := pw / fracs
+
+		for _, child := range n.Parent.Children {
+			if child.Size.W.Type == DT_FR {
+				child.RealSize.X = fracw * child.Size.W.Amount
+				child.IsWidthResolved = true
+			}
+		}
+	}
+
+	if !n.IsHeightResolved && n.Size.H.Type == DT_FR {
+		ph := n.ParentRemainingHeight()
+		fracs := n.Parent.yFracs()
+		frach := ph / fracs
+
+		for _, child := range n.Parent.Children {
+			if child.Size.H.Type == DT_FR {
+				child.RealSize.Y = frach * child.Size.H.Amount
+				child.IsHeightResolved = true
+			}
+		}
+	}
+
+	for _, child := range n.Children {
+		child.ResolveUpwards()
+	}
+}
+
+// Resolves downwards-dependent sizes
+func (n *Node) ResolveDownwards() {
+	for _, child := range n.Children {
+		child.ResolveDownwards()
+	}
+
+	if n.Size.W.Type == DT_CHILDREN {
+		switch n.Layout {
+		case LT_HORIZONTAL:
+			n.RealSize.X = n.ChildSum(nodeRealX)
+			n.IsWidthResolved = true
+
+		case LT_VERTICAL:
+			n.RealSize.X = n.ChildMax(nodeRealX)
+			n.IsWidthResolved = true
+		}
+	}
+
+	if n.Size.H.Type == DT_CHILDREN {
+		switch n.Layout {
+		case LT_VERTICAL:
+			n.RealSize.Y = n.ChildSum(nodeRealY)
+			n.IsHeightResolved = true
+
+		case LT_HORIZONTAL:
+			n.RealSize.Y = n.ChildMax(nodeRealY)
+			n.IsHeightResolved = true
+		}
+	}
+}
+
+func (n *Node) ResolveViolations() {
+	var w, h float32
+
+	switch n.Layout {
+	case LT_VERTICAL:
+		w = n.ChildMax(nodeRealX)
+		h = n.ChildSum(nodeRealY)
+
+	case LT_HORIZONTAL:
+		w = n.ChildSum(nodeRealX)
+		h = n.ChildMax(nodeRealY)
+	}
+
+	if w > n.RealSize.X {
+		fracs := n.xFracs()
+		if fracs > 0 {
+			fracdec := (w - n.RealSize.X) / fracs
+			for _, child := range n.Children {
+				if child.Size.W.Type == DT_FR {
+					child.RealSize.X -= fracdec * child.Size.W.Amount
+				}
+			}
+		}
+	}
+
+	if h > n.RealSize.Y {
+		fracs := n.yFracs()
+		if fracs > 0 {
+			fracdec := (h - n.RealSize.Y) / fracs
+			for _, child := range n.Children {
+				if child.Size.H.Type == DT_FR {
+					child.RealSize.Y -= fracdec * child.Size.H.Amount
+				}
+			}
+		}
+	}
+
+	for _, child := range n.Children { child.ResolveViolations() }
+}
+
+func nodeRealX(n *Node) float32 {
+	if n.IsWidthResolved {
+		return n.RealSize.X
+	} else {
+		return 0
+	}
+}
+
+func nodeRealY(n *Node) float32 {
+	if n.IsHeightResolved {
+		return n.RealSize.Y
+	} else {
+		return 0
+	}
+}
+
+func (n *Node) ChildSum(fn func(*Node)float32) float32 {
+	var sum float32 = 0
+	for _, child := range n.Children {
+		sum += fn(child)
+	}
+	return sum
+}
+
+func (n *Node) ChildMax(fn func(*Node)float32) float32 {
+	var val float32 = 0
+	for _, child := range n.Children {
+		cv := fn(child)
+		if cv > val { val = cv }
+	}
+	return val
+}
+
+func (n *Node) ParentWidth() float32 {
+	if n.Parent == nil { return WindowWidth() }
+	if n.Parent.IsWidthResolved { return n.Parent.RealSize.X }
+	return n.Parent.ParentWidth()
+}
+
+func (n *Node) ParentHeight() float32 {
+	if n.Parent == nil { return WindowHeight() }
+	if n.Parent.IsHeightResolved { return n.Parent.RealSize.X }
+	return n.Parent.ParentWidth()
+}
+
+func (n *Node) ParentRemainingWidth() float32 {
+	if n.Parent == nil { return WindowWidth() }
+	w := n.ParentWidth()
+	for _, child := range n.Parent.Children {
+		if child.IsWidthResolved {
+			w -= child.RealSize.X
+		}
+	}
+	return Max(w, 0)
+}
+
+func (n *Node) ParentRemainingHeight() float32 {
+	if n.Parent == nil { return WindowHeight() }
+	h := n.ParentHeight()
+	for _, child := range n.Parent.Children {
+		if child.IsHeightResolved {
+			h -= child.RealSize.Y
+		}
+	}
+	return Max(h, 0)
 }
 
 func (n *Node) ResolvePos() {
@@ -503,8 +509,8 @@ func (n *Node) ResolvePos() {
 	for _, child := range n.Children {
 		child.Pos.X = n.Pos.X + offset * xmul
 		child.Pos.Y = n.Pos.Y + offset * ymul
-		offset += child.Size.Real.X * xmul
-		offset += child.Size.Real.Y * ymul
+		offset += child.RealSize.X * xmul
+		offset += child.RealSize.Y * ymul
 		child.ResolvePos()
 	}
 }
@@ -518,7 +524,7 @@ func (n *Node) UpdateChildren() {
 func (n *Node) HasMouse() bool {
 	mx, my := Platform.MousePos.X, Platform.MousePos.Y
 	x1, y1 := n.Pos.X, n.Pos.Y
-	x2, y2 := x1 + n.Size.Real.X, y1 + n.Size.Real.Y
+	x2, y2 := x1 + n.RealSize.X, y1 + n.RealSize.Y
 
 	return (
 		mx >= x1 &&
@@ -527,9 +533,12 @@ func (n *Node) HasMouse() bool {
 		my <= y2)
 }
 
-func (n *Node) DrawPos() (float32, float32) {
-	return n.Pos.X + n.Size.Padding.Left.Real,
-		n.Pos.Y + n.Size.Padding.Top.Real
+func (n *Node) Index() int {
+	if n.Parent == nil { return -1 }
+	for idx, child := range n.Parent.Children {
+		if child == n { return idx }
+	}
+	return -1
 }
 
 type INPUT_MODE uint8
@@ -598,17 +607,22 @@ func (ui *ui_state) SetHot(node *Node, force bool) {
 func (ui *ui_state) Begin() {
 	ui.Reset()
 	ui.Root = GetNode("root", nil)
-	ui.Root.UpdateFn = rootUpdateFn;
-	ui.Current = ui.Root
+	ui.Root.UpdateFn = rootUpdateFn
+	ui.Root.RenderFn = invisibleRenderFn
 	ui.Root.Size.W = px(WindowWidth())
 	ui.Root.Size.H = px(WindowHeight())
+	ui.Current = ui.Root
 }
 
 func (ui *ui_state) End() {
 	if ui.Current != ui.Root {
 		panic("Unbalanced UI stack!")
 	}
-	ui.Root.ResolveSize()
+
+	ui.Root.ResolveStandalone()
+	ui.Root.ResolveUpwards()
+	ui.Root.ResolveDownwards()
+	ui.Root.ResolveViolations()
 	ui.Root.ResolvePos()
 
 	if Platform.MouseDelta.ManhattanLength() > 5 { ui.Mode = IM_MOUSE }
@@ -621,15 +635,10 @@ func (ui *ui_state) Render() {
 	ui.Root.Render()
 }
 
-func WithNewNode(t string, fn func(*Node)) {
-	n := UI.Push(t)
+func WithNode(n *Node, fn func(*Node)) *Node {
 	fn(n)
 	UI.Pop(n)
-}
-
-func WithNode(n *Node, fn func(*Node)) {
-	fn(n)
-	UI.Pop(n)
+	return n
 }
 
 func Row() *Node {
@@ -645,8 +654,7 @@ func Column() *Node {
 }
 
 func textRenderFn(n *Node) {
-	t, ok := n.Get("text", "").(string)
-	if !ok { t = "" }
+	t := uiGet(n, "text", "")
 
 	// r,g,b,a,_ := Platform.Renderer.GetDrawColor()
 	// defer Platform.Renderer.SetDrawColor(r, g, b, a)
@@ -658,11 +666,55 @@ func textRenderFn(n *Node) {
 	tex, _ := Platform.Renderer.CreateTextureFromSurface(surf)
 	defer tex.Destroy()
 
-	x, y := n.DrawPos()
-
 	Platform.Renderer.CopyF(tex, nil, &sdl.FRect{
-		x, y, float32(surf.W), float32(surf.H),
+		n.Pos.X, n.Pos.Y, float32(surf.W), float32(surf.H),
 	})
+}
+
+func Margin(dim Dimension, inner *Node) *Node {
+	margin := GetNode("margin-h", nil)
+	margin.RenderFn = invisibleRenderFn
+	margin.Layout = LT_HORIZONTAL
+	margin.Parent = inner.Parent
+	idx := inner.Index()
+
+	cur := UI.Current
+	defer func(){ UI.Current = cur }()
+	UI.Current = margin
+
+	Invisible(dim)
+	WithNode(UI.Push("margin-v"), func(r *Node) {
+		r.Layout = LT_VERTICAL
+		r.RenderFn = invisibleRenderFn
+
+		Invisible(dim)
+		r.Children = append(r.Children, inner)
+		inner.Parent = r
+		Invisible(dim)
+	})
+	Invisible(dim)
+
+	margin.Parent.Children[idx] = margin
+	margin.UID = buildNodeUID(margin)
+
+	old_uid := inner.UID
+	inner.UID = buildNodeUID(inner)
+
+	UI_Data[inner.UID] = UI_Data[old_uid]
+	delete(UI_Data, old_uid)
+
+	return margin
+}
+
+func invisibleRenderFn(*Node) {}
+
+func Invisible(dim Dimension) *Node {
+	n := UI.Push("invisible")
+	defer UI.Pop(n)
+	n.Size.W = dim
+	n.Size.H = dim
+	n.RenderFn = invisibleRenderFn
+	return n
 }
 
 func Text(text string) *Node {
@@ -670,9 +722,8 @@ func Text(text string) *Node {
 	defer UI.Pop(n)
 
 	n.Set("text", text)
-	n.Size.W = Auto()
-	n.Size.H = Auto()
-	n.Size.Padding = Padding{px(8), px(8), px(8), px(8)}
+	n.Size.W = fit_text()
+	n.Size.H = fit_text()
 
 	n.RenderFn = textRenderFn
 	return n
@@ -705,13 +756,20 @@ const (
 )
 
 func (p *platform) Init() {
-	window, renderer, err := sdl.CreateWindowAndRenderer(800, 600, sdl.WINDOW_SHOWN)
+	window, err := sdl.CreateWindow(
+		"", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
+		800, 600, sdl.WINDOW_SHOWN)
 	die(err)
 	p.Window = window
+
+	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_PRESENTVSYNC|sdl.RENDERER_ACCELERATED)
+	die(err)
 	p.Renderer = renderer
+
 	font, err := ttf.OpenFont(fontPath, fontSize)
 	die(err)
 	p.Font = font
+
 	p.Mouse = make(map[uint8]BUTTON_STATE)
 	p.Keyboard = make(map[uint32]BUTTON_STATE)
 	p.MousePos.X = -1
@@ -771,7 +829,7 @@ func TextWidth(text string) float32 {
 	return float32(w)
 }
 
-func TextHeightWrapped(text string, _ float32) float32 {
+func TextHeight(text string) float32 {
 	_, h, err := Platform.Font.SizeUTF8(text)
 	die(err)
 	return float32(h)
@@ -793,6 +851,12 @@ func Max[A constraints.Ordered](a, b A) A {
 
 func Min[A constraints.Ordered](a, b A) A {
 	if a < b { return a } else { return b }
+}
+
+func Clamp[A constraints.Ordered](v, min, max A) A {
+	if v < min { return min }
+	if v > max { return max }
+	return v
 }
 
 func Abs[A constraints.Float | constraints.Integer](a A) A {
@@ -828,7 +892,13 @@ func main() {
 	// Platform.Window.UpdateSurface()
 
 	running := true
+
+	LastFrameStart := uint64(0)
+	FrameTime := uint64(0)
+
 	for running {
+		FrameStart := sdl.GetTicks64()
+
 		if KeyboardPressed(sdl.SCANCODE_Q) {
 			running = false
 		}
@@ -876,23 +946,38 @@ func main() {
 
 		Platform.Renderer.SetDrawColor(255, 0, 0, 255)
 		UI.Begin(); {
+			Text(FloatStr(float64(FrameTime)/1000) + "ms")
 			WithNode(Row(), func(n *Node) {
+				n.Size.W = fr(1)
 				Text("Hello, world!")
 
-				WithNode(Column(), func(n *Node) {
+				Margin(px(8), WithNode(Column(), func(n *Node) {
 					n.Flags.Focusable = true
+					n.Size.H = child_sum()
 					Text("This")
 					Text("stacks")
-					Text("woohoo")
-				})
+					Text("Woohoo!")
+				}))
 
-				Text("Back to row")
+				Text("1").Size.W = fr(1)
+				Text("2").Size.W = fr(2)
+				Text("1").Size.W = fr(1)
 				Text("Some more")
 			})
 		} ; UI.End()
 
 		UI.Render()
-
 		Platform.Renderer.Present()
+
+		FrameTime = FrameStart - LastFrameStart
+		LastFrameStart = FrameStart
+	}
+}
+
+func PrintTree(n *Node, indent string) {
+	child_indent := indent + "  "
+	println(indent + n.Type)
+	for _, child := range n.Children {
+		PrintTree(child, child_indent)
 	}
 }
