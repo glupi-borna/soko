@@ -77,10 +77,23 @@ func StyleVars[K any](norm, hov K) StyleVariant[K] {
 	return StyleVariant[K]{ Normal: norm, Hovered: hov }
 }
 
+type Padding struct {
+	Left, Right, Top, Bottom float32
+}
+
+func Padding1(pad float32) Padding {
+	return Padding{pad, pad, pad, pad}
+}
+
+func Padding2(x float32, y float32) Padding {
+	return Padding{x, x, y, y}
+}
+
 type Style struct {
 	Foreground   StyleVariant[sdl.Color]
 	Background   StyleVariant[sdl.Color]
 	CornerRadius StyleVariant[float32]
+	Padding      Padding
 }
 
 var DefaultStyle = Style{
@@ -102,15 +115,13 @@ type NodeData map[string] any
 
 var UI_Data = make(map[string]NodeData)
 
-func uiGet[K any](n *Node, key string, dflt K) K {
+func uiGet[K any](n *Node, key string, dflt K) (out K) {
 	data, ok := UI_Data[n.UID]
 
 	// If node data doesn't exist
 	if !ok {
 		data = make(NodeData)
 		UI_Data[n.UID] = data
-		data[key] = dflt
-		return dflt
 	}
 
 	// If key does not exist in node data
@@ -121,7 +132,7 @@ func uiGet[K any](n *Node, key string, dflt K) K {
 	}
 
 	// If key is wrong type
-	out, ok := val.(K)
+	out, ok = val.(K)
 	if !ok {
 		data[key] = dflt
 		return dflt
@@ -171,10 +182,10 @@ type Node struct {
 	Parent    *Node // Parent of this node - null if the node is the root node, or is detached.
 	Children  []*Node
 	Style     *Style
+	Padding   Padding
 
 	// Semantic size
 	Size Size
-
 
 	// Calculated position
 	Pos       V2
@@ -217,6 +228,7 @@ func MakeNode(t string, parent *Node) *Node {
 		Parent: parent,
 		RenderFn: defaultRenderFn,
 		UpdateFn: defaultUpdateFn,
+		Padding: Padding1(8),
 	}
 
 	if n.Parent != nil {
@@ -372,7 +384,7 @@ func (n *Node) ResolveStandalone() {
 
 	} else if n.Size.W.Type == DT_TEXT {
 		t := uiGet(n, "text", "")
-		n.RealSize.X = TextWidth(t)
+		n.RealSize.X = TextWidth(t) + n.Padding.Left + n.Padding.Right
 		n.IsWidthResolved = true
 	}
 
@@ -382,7 +394,7 @@ func (n *Node) ResolveStandalone() {
 
 	} else if n.Size.H.Type == DT_TEXT {
 		t := uiGet(n, "text", "")
-		n.RealSize.Y = TextHeight(t)
+		n.RealSize.Y = TextHeight(t) + n.Padding.Top + n.Padding.Bottom
 		n.IsHeightResolved = true
 	}
 
@@ -433,11 +445,11 @@ func (n *Node) ResolveDownwards() {
 	if n.Size.W.Type == DT_CHILDREN {
 		switch n.Layout {
 		case LT_HORIZONTAL:
-			n.RealSize.X = n.ChildSum(nodeRealX)
+			n.RealSize.X = n.ChildSum(nodeRealX) + n.Padding.Left + n.Padding.Right
 			n.IsWidthResolved = true
 
 		case LT_VERTICAL:
-			n.RealSize.X = n.ChildMax(nodeRealX)
+			n.RealSize.X = n.ChildMax(nodeRealX) + n.Padding.Left + n.Padding.Right
 			n.IsWidthResolved = true
 		}
 	}
@@ -445,11 +457,11 @@ func (n *Node) ResolveDownwards() {
 	if n.Size.H.Type == DT_CHILDREN {
 		switch n.Layout {
 		case LT_VERTICAL:
-			n.RealSize.Y = n.ChildSum(nodeRealY)
+			n.RealSize.Y = n.ChildSum(nodeRealY) + n.Padding.Top + n.Padding.Bottom
 			n.IsHeightResolved = true
 
 		case LT_HORIZONTAL:
-			n.RealSize.Y = n.ChildMax(nodeRealY)
+			n.RealSize.Y = n.ChildMax(nodeRealY) + n.Padding.Top + n.Padding.Bottom
 			n.IsHeightResolved = true
 		}
 	}
@@ -519,13 +531,12 @@ func (n *Node) ChildSum(fn func(*Node)float32) float32 {
 	return sum
 }
 
-func (n *Node) ChildMax(fn func(*Node)float32) float32 {
-	var val float32 = 0
+func (n *Node) ChildMax(fn func(*Node)float32) (val float32) {
 	for _, child := range n.Children {
 		cv := fn(child)
 		if cv > val { val = cv }
 	}
-	return val
+	return
 }
 
 func (n *Node) ParentWidth() float32 {
@@ -542,7 +553,7 @@ func (n *Node) ParentHeight() float32 {
 
 func (n *Node) ParentRemainingWidth() float32 {
 	if n.Parent == nil { return WindowWidth() }
-	w := n.ParentWidth()
+	w := n.ParentWidth() - n.Parent.Padding.Left - n.Parent.Padding.Right
 	for _, child := range n.Parent.Children {
 		if child.IsWidthResolved {
 			w -= child.RealSize.X
@@ -553,7 +564,7 @@ func (n *Node) ParentRemainingWidth() float32 {
 
 func (n *Node) ParentRemainingHeight() float32 {
 	if n.Parent == nil { return WindowHeight() }
-	h := n.ParentHeight()
+	h := n.ParentHeight() - n.Parent.Padding.Top - n.Parent.Padding.Bottom
 	for _, child := range n.Parent.Children {
 		if child.IsHeightResolved {
 			h -= child.RealSize.Y
@@ -573,8 +584,8 @@ func (n *Node) ResolvePos() {
 	ymul := Btof(n.Layout == LT_VERTICAL)
 
 	for _, child := range n.Children {
-		child.Pos.X = n.Pos.X + offset * xmul
-		child.Pos.Y = n.Pos.Y + offset * ymul
+		child.Pos.X = n.Pos.X + n.Padding.Left + offset * xmul
+		child.Pos.Y = n.Pos.Y + n.Padding.Top + offset * ymul
 		offset += child.RealSize.X * xmul
 		offset += child.RealSize.Y * ymul
 		child.ResolvePos()
@@ -644,17 +655,14 @@ func (ui *ui_state) Reset() {
 }
 
 // Pushes a node on the UI stack.
-func (UI *ui_state) Push(t string) *Node {
-	n := GetNode(t, UI.Current)
+func (UI *ui_state) Push(t string) (n *Node) {
+	n = GetNode(t, UI.Current)
 	UI.Current = n
-	return n
+	return
 }
 
 // Pops a node off the UI stack.
 func (UI *ui_state) Pop(n *Node) *Node {
-	if UI.Current == UI.Root {
-		panic("Unbalanced UI stack!")
-	}
 	UI.Current = n.Parent
 	return n
 }
@@ -747,7 +755,9 @@ func textRenderFn(n *Node) {
 	defer tex.Destroy()
 
 	Platform.Renderer.CopyF(tex, nil, &sdl.FRect{
-		n.Pos.X, n.Pos.Y, float32(surf.W), float32(surf.H),
+		float32(math.Round(float64(n.Pos.X + n.Padding.Left))),
+		float32(math.Round(float64(n.Pos.Y + n.Padding.Top))),
+		float32(surf.W), float32(surf.H),
 	})
 }
 
@@ -804,6 +814,7 @@ func Text(text string) *Node {
 	n.Set("text", text)
 	n.Size.W = fit_text()
 	n.Size.H = fit_text()
+	n.Padding = Padding{}
 
 	n.RenderFn = textRenderFn
 	return n
@@ -994,15 +1005,12 @@ func WindowHeight() float32 {
 }
 
 func TextWidth(text string) float32 {
-	w, _, err := Platform.Font.SizeUTF8(text)
-	die(err)
+	w, _, _ := Platform.Font.SizeUTF8(text)
 	return float32(w)
 }
 
 func TextHeight(text string) float32 {
-	_, h, err := Platform.Font.SizeUTF8(text)
-	die(err)
-	return float32(h)
+	return float32(Platform.Font.Height())
 }
 
 func ButtonMapUpdate[K comparable](m map[K]BUTTON_STATE) {
@@ -1128,22 +1136,30 @@ func main() {
 				n.Size.W = fr(1)
 				Text("Hello, world!")
 
-				Margin(px(8), WithNode(Column(), func(n *Node) {
-					n.Flags.Focusable = true
-					n.Style = &ButtonStyle
-					n.Size.W = px(100)
-					n.Size.H = px(100)
-					n.Size.H = child_sum()
-					Text("This")
-					Text("stacks")
-					Text("Woohoo!")
-				}))
+				WithNode(Column(), func(n *Node) {
+					n.Padding = Padding2(8, -8)
+					WithNode(Column(), func(n *Node) {
+						n.Flags.Focusable = true
+						n.Style = &ButtonStyle
+						n.Size.W = px(100)
+						n.Size.H = child_sum()
+						Text("Button")
+					})
+					Text("Under button").Padding = Padding1(16)
+				})
 
-				Text("1").Size.W = fr(1)
+				WithNode(Column(), func(n *Node) {
+					n.Padding.Top = 0
+					n.Size.H = child_sum()
+					Text("Stacked")
+					Text("text")
+				})
 
 				Seconds := FrameStart / 1000
-				Text("2").Size.W = fr(Animate(float32(Seconds % 2 + 1), "1"))
-				Text("1").Size.W = fr(Animate(float32(Seconds % 3 + 1), "2"))
+				t1 := float32(Seconds % 2 + 1)
+				t2 := float32(Seconds % 3 + 1)
+				Text(FloatStr(t1)).Size.W = fr(Animate(t1, "1"))
+				Text(FloatStr(t2)).Size.W = fr(Animate(t2, "2"))
 				Text("Some more")
 			})
 		} ; UI.End()
