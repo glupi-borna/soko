@@ -6,6 +6,16 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
+type V2 struct { X, Y float32 }
+
+func (v *V2) ManhattanLength() float32 {
+	return Abs(v.X) + Abs(v.Y)
+}
+
+func (v *V2) String() string {
+	return "V2{ " + FloatStr(v.X) + ", " + FloatStr(v.Y) + " }"
+}
+
 func Max[A constraints.Ordered](a, b A) A {
 	if a > b { return a } else { return b }
 }
