@@ -2,11 +2,15 @@ package main
 
 import (
 	"runtime"
+	"flag"
+	"os"
+	"runtime/pprof"
 	"strconv"
 	"math"
-	"golang.org/x/exp/constraints"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
+	lru "github.com/glupi-borna/wiggo/internal/lru"
+	. "github.com/glupi-borna/wiggo/internal/utils"
 )
 
 type DIM_TYPE uint8
@@ -14,10 +18,6 @@ const (
 	DT_AUTO DIM_TYPE = iota
 	DT_PX ; DT_FR ; DT_TEXT ; DT_CHILDREN ; DT_SKIP
 )
-
-func FloatStr[F constraints.Float](f F) string {
-	return strconv.FormatFloat(float64(f), 'f', 3, 32)
-}
 
 type Dimension struct {
 	Type       DIM_TYPE
@@ -737,6 +737,38 @@ func Column() *Node {
 	return n
 }
 
+var fontTextureCache = lru.New(200, func (t *sdl.Texture) { t.Destroy() })
+func fontCacheKey(f Font, text string, c sdl.Color) string {
+	return f.CacheName + ColStr(c) + "|" + text
+}
+
+func GetTextTexture(f Font, t string, c sdl.Color) *sdl.Texture {
+	key := fontCacheKey(f, t, c)
+	tex, ok := fontTextureCache.Get(key)
+	if ok { return tex }
+	surf, _ := f.SDLFont.RenderUTF8Blended(t, c)
+	tex, _ = Platform.Renderer.CreateTextureFromSurface(surf)
+	surf.Free()
+	fontTextureCache.Set(key, tex)
+	return tex
+}
+
+var textMetricsCache = make(map[string]V2, 100)
+func textMetricsCacheKey(f Font, text string) string {
+	return f.CacheName + "|" + text
+}
+
+func TextMetrics(text string) V2 {
+	key := textMetricsCacheKey(Platform.Font, text)
+	m, ok := textMetricsCache[key]
+	if !ok {
+		w, h, _ := Platform.Font.SDLFont.SizeUTF8(text)
+		m = V2{float32(w), float32(h)}
+		textMetricsCache[key] = m
+	}
+	return m
+}
+
 func textRenderFn(n *Node) {
 	t := uiGet(n, "text", "")
 	s := n.GetStyle()
@@ -748,16 +780,13 @@ func textRenderFn(n *Node) {
 		c = s.Foreground.Normal
 	}
 
-	surf, _ := Platform.Font.RenderUTF8Blended(t, c)
-	defer surf.Free()
-
-	tex, _ := Platform.Renderer.CreateTextureFromSurface(surf)
-	defer tex.Destroy()
+	tex := GetTextTexture(Platform.Font, t, c)
+	m := TextMetrics(t)
 
 	Platform.Renderer.CopyF(tex, nil, &sdl.FRect{
 		float32(math.Round(float64(n.Pos.X + n.Padding.Left))),
 		float32(math.Round(float64(n.Pos.Y + n.Padding.Top))),
-		float32(surf.W), float32(surf.H),
+		m.X, m.Y,
 	})
 }
 
@@ -828,10 +857,16 @@ const (
 	BS_RELEASED
 )
 
+type Font struct {
+	SDLFont *ttf.Font
+	CacheName string
+	Height   float32
+}
+
 type platform struct {
 	Window *sdl.Window
 	Renderer *sdl.Renderer
-	Font *ttf.Font
+	Font Font
 	Mouse map[uint8]BUTTON_STATE
 	MousePos V2
 	MouseDelta V2
@@ -857,16 +892,22 @@ func (p *platform) Init() {
 	window, err := sdl.CreateWindow(
 		"", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
 		800, 600, window_flags)
-	die(err)
+	Die(err)
 	p.Window = window
 
-	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_PRESENTVSYNC|sdl.RENDERER_ACCELERATED)
-	die(err)
+	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_PRESENTVSYNC | sdl.RENDERER_ACCELERATED)
+	Die(err)
 	p.Renderer = renderer
 
 	font, err := ttf.OpenFont(fontPath, fontSize)
-	die(err)
-	p.Font = font
+	Die(err)
+
+	fh := font.Height()
+	p.Font = Font{
+		SDLFont: font,
+		Height: float32(fh),
+		CacheName: font.FaceFamilyName() + "|" + font.FaceStyleName() + strconv.Itoa(fh) + "|",
+	}
 
 	p.Mouse = make(map[uint8]BUTTON_STATE)
 	p.Keyboard = make(map[uint32]BUTTON_STATE)
@@ -876,7 +917,7 @@ func (p *platform) Init() {
 
 func (p *platform) Cleanup() {
 	p.Window.Destroy()
-	p.Font.Close()
+	p.Font.SDLFont.Close()
 }
 
 func DrawRectOutlined(x, y, w, h float32) {
@@ -1005,12 +1046,11 @@ func WindowHeight() float32 {
 }
 
 func TextWidth(text string) float32 {
-	w, _, _ := Platform.Font.SizeUTF8(text)
-	return float32(w)
+	return TextMetrics(text).X
 }
 
 func TextHeight(text string) float32 {
-	return float32(Platform.Font.Height())
+	return TextMetrics(text).Y
 }
 
 func ButtonMapUpdate[K comparable](m map[K]BUTTON_STATE) {
@@ -1023,41 +1063,28 @@ func ButtonMapUpdate[K comparable](m map[K]BUTTON_STATE) {
 	}
 }
 
-func Max[A constraints.Ordered](a, b A) A {
-	if a > b { return a } else { return b }
-}
-
-func Min[A constraints.Ordered](a, b A) A {
-	if a < b { return a } else { return b }
-}
-
-func Clamp[A constraints.Ordered](v, min, max A) A {
-	if v < min { return min }
-	if v > max { return max }
-	return v
-}
-
-func Abs[A constraints.Float | constraints.Integer](a A) A {
-	if a < 0 { return -a } else { return a }
-}
-
-func Btof(b bool) float32 {
-	if b { return 1 } else { return 0 }
-}
-
-func die(err error) {
-	if err != nil { panic(err) }
-}
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+var timeout = flag.Uint64("timeout", 0, "stop running after this number of milliseconds (0 = no timeout)")
+var vsync = flag.Bool("vsync", true, "enable/disable vsync")
+var override_redirect = flag.Bool("override-redirect", true, "enable/disable override-redirect (X11)")
 
 func main() {
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		Die(err)
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	runtime.LockOSThread()
 
 	err := sdl.Init(sdl.INIT_EVERYTHING)
-	die(err)
+	Die(err)
 	defer sdl.Quit()
 
 	err = ttf.Init()
-	die(err)
+	Die(err)
 	defer ttf.Quit()
 
 	Platform.Init()
@@ -1076,10 +1103,8 @@ func main() {
 
 	for running {
 		FrameStart := sdl.GetTicks64()
-
-		if KeyboardPressed(sdl.SCANCODE_Q) {
-			running = false
-		}
+		if *timeout > 0 && FrameStart > *timeout { running = false }
+		if KeyboardPressed(sdl.SCANCODE_Q) { running = false }
 
 		ButtonMapUpdate(Platform.Keyboard)
 		ButtonMapUpdate(Platform.Mouse)
