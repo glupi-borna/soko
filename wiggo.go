@@ -45,6 +45,7 @@ func main() {
 	LastFrameStart := uint64(0)
 	FrameTime := uint64(0)
 	count := 0
+	val := float32(5)
 
 	for running {
 		FrameStart := sdl.GetTicks64()
@@ -134,6 +135,13 @@ func main() {
 
 				Text("Some more")
 			})
+
+			val, slider := Slider(val, -10, 10)
+			Text(FloatStr(val))
+			if TextButton("Set to 0") {
+				slider.Set("perc", float32(0.5))
+				slider.Set("perc-changed", true)
+			}
 		} ; UI.End()
 
 		UI.Render()

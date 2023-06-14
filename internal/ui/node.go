@@ -82,6 +82,9 @@ type Node struct {
 	// Called after the position and size of the Node
 	// have been resolved.
 	UpdateFn func(*Node)
+
+	// The UI State object associated with this node
+	UI *ui_state
 }
 
 // Currently does the same as MakeNode, but
@@ -107,6 +110,7 @@ func MakeNode(t string, parent *Node) *Node {
 		RenderFn: defaultRenderFn,
 		UpdateFn: defaultUpdateFn,
 		Padding: Padding1(8),
+		UI: CurrentUI,
 	}
 
 	if n.Parent != nil {
@@ -153,12 +157,9 @@ func rootUpdateFn(n *Node) {
 		if n.HasMouse() {
 			CurrentUI.SetActive(nil, false)
 			if MousePressed(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
+			if MouseReleased(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
 		}
 	}
-}
-
-func (n *Node) Clicked() bool {
-	return n.Flags.Focusable && n.UID == CurrentUI.Hot && MouseReleased(sdl.BUTTON_LEFT)
 }
 
 func (n *Node) CountChildrenOfType(t string) int {
@@ -412,9 +413,11 @@ func (n *Node) ParentHeight() float32 {
 func (n *Node) ParentRemainingWidth() float32 {
 	if n.Parent == nil { return WindowWidth() }
 	w := n.ParentWidth() - n.Parent.Padding.Left - n.Parent.Padding.Right
-	for _, child := range n.Parent.Children {
-		if child.IsWidthResolved {
-			w -= child.RealSize.X
+	if n.Parent.Layout == LT_HORIZONTAL {
+		for _, child := range n.Parent.Children {
+			if child.IsWidthResolved {
+				w -= child.RealSize.X
+			}
 		}
 	}
 	return Max(w, 0)
@@ -423,9 +426,11 @@ func (n *Node) ParentRemainingWidth() float32 {
 func (n *Node) ParentRemainingHeight() float32 {
 	if n.Parent == nil { return WindowHeight() }
 	h := n.ParentHeight() - n.Parent.Padding.Top - n.Parent.Padding.Bottom
-	for _, child := range n.Parent.Children {
-		if child.IsHeightResolved {
-			h -= child.RealSize.Y
+	if n.Parent.Layout == LT_VERTICAL {
+		for _, child := range n.Parent.Children {
+			if child.IsHeightResolved {
+				h -= child.RealSize.Y
+			}
 		}
 	}
 	return Max(h, 0)
@@ -483,4 +488,16 @@ func (n *Node) Index() int {
 		if child == n { return idx }
 	}
 	return -1
+}
+
+func (n *Node) Clicked() bool {
+	return n.Flags.Focusable && n.UID == CurrentUI.Hot && MouseReleased(sdl.BUTTON_LEFT)
+}
+
+func (n *Node) Focused() bool {
+	return n.Flags.Focusable && (n.UID == CurrentUI.Hot || n.UID == CurrentUI.Active)
+}
+
+func (n *Node) MouseOffset() (float32, float32) {
+	return Platform.MousePos.X - n.Pos.X, Platform.MousePos.Y - n.Pos.Y
 }

@@ -6,15 +6,32 @@ import (
 
 type StyleVariant[K any] struct {
 	Normal  K
-	Hovered K
+	Active K
+	Hot K
+}
+
+func ColHex(col uint32) sdl.Color {
+	r := uint8(col >> 24 & 0xff)
+	g := uint8(col >> 16 & 0xff)
+	b := uint8(col >> 8 & 0xff)
+	a := uint8(col & 0xff)
+	return sdl.Color{r,g,b,a}
+}
+
+func Col(col uint8) sdl.Color {
+	return sdl.Color{col, col, col, 255}
 }
 
 func StyleVar[K any](val K) StyleVariant[K] {
-	return StyleVariant[K]{ Normal: val, Hovered: val }
+	return StyleVariant[K]{ Normal: val, Active: val, Hot: val }
+}
+
+func StyleVar2[K any](normal K, active_hot K) StyleVariant[K] {
+	return StyleVariant[K]{ Normal: normal, Active: active_hot, Hot: active_hot }
 }
 
 func StyleVars[K any](norm, hov K) StyleVariant[K] {
-	return StyleVariant[K]{ Normal: norm, Hovered: hov }
+	return StyleVariant[K]{ Normal: norm, Active: hov }
 }
 
 type Padding struct {
@@ -42,36 +59,32 @@ func (s *Style) Copy() *Style {
 	return &new
 }
 
+func (s *Style) SetBorder(border StyleVariant[sdl.Color]) *Style {
+	s.Border = border
+	return s
+}
+
+func (s *Style) Invert() *Style {
+	bg := s.Background
+	s.Background = s.Foreground
+	s.Foreground = bg
+	return s
+}
+
 var DefaultStyle = Style{
-	Foreground: StyleVariant[sdl.Color]{
-		Normal: sdl.Color{255, 255, 255, 255},
-		Hovered: sdl.Color{255, 255, 255, 255},
-	},
-	Background: StyleVariant[sdl.Color]{
-		Normal: sdl.Color{0, 0, 0, 0},
-		Hovered: sdl.Color{0, 0, 0, 0},
-	},
-	Border: StyleVariant[sdl.Color]{
-		Normal: sdl.Color{0, 0, 0, 0},
-		Hovered: sdl.Color{0, 0, 0, 0},
-	},
-	CornerRadius: StyleVariant[float32]{
-		Normal: 3,
-		Hovered: 3,
-	},
+	Foreground: StyleVar(Col(255)),
+	Background: StyleVar(ColHex(0x0)),
+	Border: StyleVar(ColHex(0x0)),
+	CornerRadius: StyleVar[float32](3),
 }
 
 var ButtonStyle = Style{
-	Foreground: StyleVariant[sdl.Color]{
-		Normal: sdl.Color{0, 0, 0, 255},
-		Hovered: sdl.Color{0, 0, 0, 255},
-	},
-	Background: StyleVariant[sdl.Color]{
-		Normal: sdl.Color{255, 255, 255, 255},
-		Hovered: sdl.Color{50, 50, 50, 255},
-	},
-	CornerRadius: StyleVariant[float32]{
-		Normal: 5,
-		Hovered: 5,
-	},
+	Foreground: StyleVar(Col(0)),
+	Background: StyleVar2(Col(255), Col(200)),
+	CornerRadius: StyleVar[float32](5),
 }
+
+var SliderStyle = ButtonStyle.Copy().
+	Invert().
+	SetBorder(
+		StyleVar(Col(255)))

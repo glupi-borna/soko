@@ -112,11 +112,14 @@ func (ui *ui_state) Pop(n *Node) *Node {
 
 func (ui *ui_state) SetActive(node *Node, force bool) {
 	if ui.ActiveChanged && !force { return }
+	if ui.Hot != "" { return }
+
 	if node == nil {
 		ui.Active = ""
 	} else {
 		ui.Active = node.UID
 	}
+
 	ui.ActiveChanged = true
 }
 

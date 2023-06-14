@@ -20,7 +20,7 @@ func DrawRectFilled(x, y, w, h float32) {
 
 
 func ArcPoints(x, y, r, startAngle, endAngle float32) []sdl.FPoint {
-	CORNER_POINTS := Max(5, int(r)/5)
+	CORNER_POINTS := cornerPointsCount(r)
 
 	points := make([]sdl.FPoint, CORNER_POINTS)
 	angleRange := float64(Abs(startAngle - endAngle))
@@ -44,7 +44,7 @@ func ArcPoints(x, y, r, startAngle, endAngle float32) []sdl.FPoint {
 func RoundRectPoints(x, y, w, h, r float32) []sdl.FPoint {
 	r = Clamp(r, 0, Min(w/2, h/2))
 
-	CORNER_POINTS := Max(5, int(r)/5)
+	CORNER_POINTS := cornerPointsCount(r)
 	TOTAL_POINTS := CORNER_POINTS * 4
 
 	x1 := x+r
@@ -62,12 +62,25 @@ func RoundRectPoints(x, y, w, h, r float32) []sdl.FPoint {
 	return points
 }
 
+// Calculates ideal number of points for 90 degree
+// arc depending on the radius.
+// Used for drawing rounded rectangles.
+func cornerPointsCount(r float32) int {
+	// The formula is
+	//     2*pi*r*(angle/360)
+	// Since the angle is always 90, we can
+	// simplify (2 * (90/360)) to 0.5
+	const MIN_SEGMENT_LENGTH = 2
+	arc_length := 0.5 * math.Pi * r
+	return int(Max(arc_length / MIN_SEGMENT_LENGTH, 2))
+}
+
 func DrawPoints(pts []sdl.FPoint) {
 	Platform.Renderer.DrawPointsF(pts)
 }
 
 func DrawRoundRectOutlined(x, y, w, h, r float32) {
-	points := RoundRectPoints(x, y, w, h, r)
+	points := RoundRectPoints(x, y, Max(w-1, 0), Max(h-1, 0), r)
 	Platform.Renderer.DrawLinesF(points)
 	l := len(points)-1
 	Platform.Renderer.DrawLineF(points[0].X, points[0].Y, points[l].X, points[l].Y)

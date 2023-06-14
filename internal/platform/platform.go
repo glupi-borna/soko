@@ -38,6 +38,7 @@ func (p *platform) Init() {
 		sdl.WINDOW_BORDERLESS |
 		sdl.WINDOW_UTILITY |
 		sdl.WINDOW_ALWAYS_ON_TOP
+	sdl.SetHint("SDL_X11_FORCE_OVERRIDE_REDIRECT", "1")
 
 	sdl.GLSetAttribute(sdl.GL_MULTISAMPLESAMPLES, 4)
 	window, err := sdl.CreateWindow(

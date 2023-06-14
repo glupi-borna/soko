@@ -2,23 +2,39 @@ package ui
 
 import (
 	"math"
+	"golang.org/x/exp/constraints"
 	"github.com/veandco/go-sdl2/sdl"
 	. "github.com/glupi-borna/wiggo/internal/platform"
+	. "github.com/glupi-borna/wiggo/internal/utils"
 )
 
-func drawNodeRect(n *Node, s *Style, hovered bool) {
+func drawNodeRectBg(pos V2, size V2, s *Style, hovered bool) {
+	drawNodeRect(pos, size, s.CornerRadius, s.Background, s.Border, hovered)
+}
+
+func drawNodeRectFg(pos V2, size V2, s *Style, hovered bool) {
+	drawNodeRect(pos, size, s.CornerRadius, s.Foreground, s.Border, hovered)
+}
+
+func drawNodeRect(
+	pos V2, size V2,
+	corner_style StyleVariant[float32],
+	bg_color StyleVariant[sdl.Color],
+	border_color StyleVariant[sdl.Color],
+	hovered bool,
+) {
 	var corner float32
 	var borderc sdl.Color
 	var bgc sdl.Color
 
 	if hovered {
-		corner = s.CornerRadius.Hovered
-		borderc = s.Border.Hovered
-		bgc = s.Background.Hovered
+		corner = corner_style.Active
+		borderc = border_color.Active
+		bgc = bg_color.Active
 	} else {
-		corner = s.CornerRadius.Normal
-		borderc = s.Border.Normal
-		bgc = s.Background.Normal
+		corner = corner_style.Normal
+		borderc = border_color.Normal
+		bgc = bg_color.Normal
 	}
 
 	border := borderc.A != 0
@@ -27,29 +43,29 @@ func drawNodeRect(n *Node, s *Style, hovered bool) {
 	if corner == 0 {
 		if bg {
 			SetColor(bgc)
-			DrawRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+			DrawRectFilled(pos.X, pos.Y, size.X, size.Y)
 		}
 
 		if border {
 			SetColor(borderc)
-			DrawRectOutlined(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+			DrawRectOutlined(pos.X, pos.Y, size.X, size.Y)
 		}
 	} else {
 		if bg {
 			SetColor(bgc)
-			DrawRoundRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y, corner)
+			DrawRoundRectFilled(pos.X, pos.Y, size.X, size.Y, corner)
 		}
 
 		if border {
 			SetColor(borderc)
-			DrawRoundRectOutlined(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y, corner)
+			DrawRoundRectOutlined(pos.X, pos.Y, size.X, size.Y, corner)
 		}
 	}
 }
 
 func defaultRenderFn(n *Node) {
 	s := n.GetStyle()
-	drawNodeRect(n, s, CurrentUI.Active == n.UID)
+	drawNodeRectBg(n.Pos, n.RealSize, s, CurrentUI.Active == n.UID)
 }
 
 func textRenderFn(n *Node) {
@@ -60,12 +76,12 @@ func textRenderFn(n *Node) {
 	var hov = false
 	if CurrentUI.Active == n.UID || n.IsChildOfUID(CurrentUI.Active) {
 		hov = true
-		c = s.Foreground.Hovered
+		c = s.Foreground.Active
 	} else {
 		c = s.Foreground.Normal
 	}
 
-	drawNodeRect(n, s, hov)
+	drawNodeRectBg(n.Pos, n.RealSize, s, hov)
 
 	tex := GetTextTexture(Platform.Font, t, c)
 	m := TextMetrics(t)
@@ -75,6 +91,45 @@ func textRenderFn(n *Node) {
 		float32(math.Round(float64(n.Pos.Y + n.Padding.Top))),
 		m.X, m.Y,
 	})
+}
+
+func sliderRenderFn(n *Node) {
+	s := n.GetStyle()
+	hov := n.Focused()
+	perc := Animate(uiGet[float32](n, "perc", 0.5), n.UID + "-slider-anim")
+	scaled_size := V2{ X: n.RealSize.X * perc, Y: n.RealSize.Y }
+	if perc < 1 { drawNodeRectBg(n.Pos, n.RealSize, s, hov) }
+	if perc > 0 { drawNodeRect(n.Pos, scaled_size, s.CornerRadius, s.Foreground, StyleVariant[sdl.Color]{}, hov) }
+}
+
+type Number interface {
+	constraints.Integer|constraints.Float
+}
+
+func sliderUpdateFn(n *Node) {
+	if CurrentUI.Mode == IM_MOUSE {
+		if n.UID == n.UI.Hot {
+			new_perc := Clamp((Platform.MousePos.X - n.Pos.X) / n.RealSize.X, 0, 1)
+			n.Set("perc", new_perc)
+			n.Set("perc-changed", true)
+		}
+
+		if n.HasMouse() {
+			CurrentUI.SetActive(n, false)
+			if MousePressed(sdl.BUTTON_LEFT) { CurrentUI.SetHot(n, false) }
+			if MouseReleased(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
+		}
+	}
+
+	if CurrentUI.Mode == IM_KBD && CurrentUI.Active == n.UID {
+		// xkbd := Btof(KeyboardPressed(sdl.SCANCODE_RIGHT)) - Btof(KeyboardPressed(sdl.SCANCODE_LEFT))
+		// ykbd := Btof(KeyboardPressed(sdl.SCANCODE_DOWN)) - Btof(KeyboardPressed(sdl.SCANCODE_UP))
+		/*
+			if xkbd != 0 && ykbd != 0 {
+				_UI.MoveActive(n, xkbd, ykbd)
+			}
+		*/
+	}
 }
 
 func invisibleRenderFn(*Node) {}
@@ -165,4 +220,40 @@ func TextButton(text string) bool {
 	Text(text)
 
 	return n.Clicked()
+}
+
+func Button(fn func(*Node)) *Node {
+	n := CurrentUI.Push("button")
+	defer CurrentUI.Pop(n)
+
+	n.Flags.Focusable = true
+	n.Style = &ButtonStyle
+	n.Padding = Padding2(8, 4)
+
+	WithNode(n, fn)
+
+	return n
+}
+
+func Slider(val, min, max float32) (float32, *Node) {
+	n := CurrentUI.Push("slider")
+	defer CurrentUI.Pop(n)
+
+	diff := max - min
+
+	n.Flags.Focusable = true
+	n.RenderFn = sliderRenderFn
+	n.UpdateFn = sliderUpdateFn
+	n.Style = SliderStyle
+	n.Size.W = Px(200)
+
+	perc := Clamp(val - min, 0, diff) / diff
+	if uiGet(n, "perc-changed", false) {
+		perc = uiGet(n, "perc", perc)
+	} else {
+		n.Set("perc", perc)
+		n.Set("perc-changed", false)
+	}
+
+	return (perc*diff)+min, n
 }

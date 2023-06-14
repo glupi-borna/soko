@@ -42,6 +42,18 @@ func MouseReleased(btn uint8) bool {
 	return state == BS_RELEASED
 }
 
+func MouseDown(btn uint8) bool {
+	state, ok := Platform.Mouse[btn]
+	if !ok { return false }
+	return state == BS_DOWN
+}
+
+func MouseUp(btn uint8) bool {
+	state, ok := Platform.Mouse[btn]
+	if !ok { return false }
+	return state == BS_UP
+}
+
 func WindowWidth() float32 {
 	w, _ := Platform.Window.GetSize()
 	return float32(w)
