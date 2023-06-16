@@ -66,11 +66,11 @@ func RoundRectPoints(x, y, w, h, r float32) []sdl.FPoint {
 // arc depending on the radius.
 // Used for drawing rounded rectangles.
 func cornerPointsCount(r float32) int {
+	const MIN_SEGMENT_LENGTH = 0.5
 	// The formula is
 	//     2*pi*r*(angle/360)
 	// Since the angle is always 90, we can
 	// simplify (2 * (90/360)) to 0.5
-	const MIN_SEGMENT_LENGTH = 2
 	arc_length := 0.5 * math.Pi * r
 	return int(Max(arc_length / MIN_SEGMENT_LENGTH, 2))
 }

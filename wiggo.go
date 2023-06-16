@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"strconv"
 	"runtime"
 	"flag"
@@ -18,7 +19,32 @@ var timeout = flag.Uint64("timeout", 0, "stop running after this number of milli
 var vsync = flag.Bool("vsync", true, "enable/disable vsync")
 var override_redirect = flag.Bool("override-redirect", true, "enable/disable override-redirect (X11)")
 
+var window_x = flag.Int("window-x", sdl.WINDOWPOS_UNDEFINED, "The x-position of the anchor of the window")
+var window_y = flag.Int("window-y", sdl.WINDOWPOS_UNDEFINED, "The y-position of the anchor of the window")
+var window_anchor WindowAnchorFlag
+
+type WindowAnchorFlag struct {
+	Anchor string
+}
+
+func (w WindowAnchorFlag) String() string { return w.Anchor }
+func (w WindowAnchorFlag) Set(val string) error {
+	if val == "top-left" {
+		w.Anchor = val
+		return nil
+	}
+
+	if val == "center" {
+		w.Anchor = val
+		return nil
+	}
+
+	return errors.New("Unsupported window-anchor value: '" + val + "'")
+}
+
 func main() {
+	flag.Var(window_anchor, "window-anchor", "Position the window anchor (center or top-left)")
+
 	flag.Parse()
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -37,7 +63,7 @@ func main() {
 	Die(err)
 	defer ttf.Quit()
 
-	Platform.Init()
+	Platform.Init(int32(*window_x), int32(*window_y), 200, 200)
 	UI := MakeUI()
 
 	running := true

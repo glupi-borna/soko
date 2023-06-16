@@ -32,18 +32,19 @@ type platform struct {
 	AnyKeyPressed bool
 }
 
-func (p *platform) Init() {
+func (p *platform) Init(x, y, w, h int32) {
 	var window_flags uint32 =
 		sdl.WINDOW_SHOWN |
 		sdl.WINDOW_BORDERLESS |
 		sdl.WINDOW_UTILITY |
 		sdl.WINDOW_ALWAYS_ON_TOP
-	sdl.SetHint("SDL_X11_FORCE_OVERRIDE_REDIRECT", "1")
 
+	sdl.SetHint("SDL_X11_FORCE_OVERRIDE_REDIRECT", "1")
 	sdl.GLSetAttribute(sdl.GL_MULTISAMPLESAMPLES, 4)
+	sdl.GLSetAttribute(sdl.GL_MULTISAMPLEBUFFERS, 1)
+
 	window, err := sdl.CreateWindow(
-		"", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		800, 600, window_flags)
+		"", x, y, w, h, window_flags)
 	Die(err)
 	p.Window = window
 
