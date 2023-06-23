@@ -2,7 +2,7 @@ package main
 
 import (
 	"errors"
-	"strconv"
+	// "strconv"
 	"runtime"
 	"flag"
 	"os"
@@ -12,7 +12,10 @@ import (
 	. "github.com/glupi-borna/wiggo/internal/utils"
 	. "github.com/glupi-borna/wiggo/internal/platform"
 	. "github.com/glupi-borna/wiggo/internal/ui"
+	"github.com/glupi-borna/wiggo/internal/widget"
 )
+
+var widget_name = flag.String("widget", "", "name of the widget to load")
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var timeout = flag.Uint64("timeout", 0, "stop running after this number of milliseconds (0 = no timeout)")
@@ -53,9 +56,16 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	if widget_name == nil || *widget_name == "" {
+		Die(errors.New("Widget name not provided!"))
+	}
+
+	w, err := widget.Load(*widget_name)
+	Die(err)
+
 	runtime.LockOSThread()
 
-	err := sdl.Init(sdl.INIT_EVERYTHING)
+	err = sdl.Init(sdl.INIT_EVERYTHING)
 	Die(err)
 	defer sdl.Quit()
 
@@ -68,10 +78,16 @@ func main() {
 
 	running := true
 
-	LastFrameStart := uint64(0)
-	FrameTime := uint64(0)
-	count := 0
-	val := float32(5)
+	// LastFrameStart := uint64(0)
+	// FrameTime := uint64(0)
+	// count := 0
+	// val := float32(5)
+
+	err = w.Init()
+	Die(err)
+	defer func() {
+		Die(w.Cleanup())
+	}()
 
 	for running {
 		FrameStart := sdl.GetTicks64()
@@ -122,7 +138,8 @@ func main() {
 		Platform.Renderer.SetDrawColor(255, 0, 0, 255)
 
 		UI.Begin(); {
-			Text(FloatStr(float64(FrameTime)/1000) + "ms")
+			Die(w.Frame())
+			/*Text(FloatStr(float64(FrameTime)/1000) + "ms")
 
 			WithNode(Row(), func(n *Node) {
 				n.Size.W = Fr(1)
@@ -167,14 +184,14 @@ func main() {
 			if TextButton("Set to 0") {
 				slider.Set("perc", float32(0.5))
 				slider.Set("perc-changed", true)
-			}
+			}*/
 		} ; UI.End()
 
 		UI.Render()
 		Platform.Renderer.Present()
 
-		FrameTime = FrameStart - LastFrameStart
-		LastFrameStart = FrameStart
+		// FrameTime = FrameStart - LastFrameStart
+		// LastFrameStart = FrameStart
 	}
 }
 
