@@ -1,6 +1,7 @@
 package widget
 
 import (
+	"golang.org/x/exp/constraints"
 	"reflect"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +10,7 @@ import (
 	"errors"
 	"github.com/yuin/gopher-lua"
 	"github.com/glupi-borna/wiggo/internal/ui"
+	. "github.com/glupi-borna/wiggo/internal/utils"
 )
 
 type Widget interface {
@@ -67,13 +69,61 @@ func GetArgs(l *lua.LState) []lua.LValue {
 	return args
 }
 
-func LValStr(val lua.LValue) (string, error) {
+type ArgCheck func (val lua.LValue) (any, error)
+
+func NumCheck[V constraints.Float | constraints.Integer](val lua.LValue) (any, error) {
+	v, ok := val.(lua.LNumber)
+	if ok { return V(v), nil }
+	return "", errors.New("Expected a string, got " + val.Type().String())
+}
+
+func StrCheck(val lua.LValue) (any, error) {
 	v, ok := val.(lua.LString)
 	if ok { return v.String(), nil }
 	return "", errors.New("Expected a string, got " + val.Type().String())
 }
 
-func MakeLValue(val any) (lua.LValue, error) {
+func BoolCheck(val lua.LValue) (any, error) {
+	v, ok := val.(lua.LBool)
+	if ok { return bool(v), nil }
+	return false, errors.New("Expected a string, got " + val.Type().String())
+}
+
+func checkArgs(
+	args []lua.LValue,
+	variadic bool,
+	checks []ArgCheck,
+) ([]reflect.Value, error) {
+	maxcheck := len(checks) - 1
+
+	if variadic {
+		if len(args) < maxcheck {
+			return nil, errors.New(
+				fmt.Sprintln("Expected at least", maxcheck, "arguments, but got", len(args)),
+			)
+		}
+	} else {
+		if len(args)-1 != maxcheck {
+			return nil, errors.New(
+				fmt.Sprintln("Expected exactly", maxcheck, "arguments, but got", len(args)),
+			)
+		}
+	}
+
+	out := make([]reflect.Value, len(args))
+
+	for i, arg := range args {
+		idx := Min(i, maxcheck)
+		check := checks[idx]
+		val, err := check(arg)
+		if err != nil { return nil, err }
+		out[i] = reflect.ValueOf(val)
+	}
+
+	return out, nil
+}
+
+func makeLValue(val any) (lua.LValue, error) {
 	switch v := val.(type) {
 	case nil: return lua.LNil, nil
 	case string: return lua.LString(v), nil
@@ -100,14 +150,67 @@ func MakeLValue(val any) (lua.LValue, error) {
 	}
 }
 
-func (lw *LuaWidget) ExposeFn(name string, fn func (args ...lua.LValue) any) {
+func (lw *LuaWidget) exposeFn(name string, fn any) error {
+	val := reflect.ValueOf(fn)
+	if val.Kind() != reflect.Func { return errors.New("Attempt to expose non-func") }
+
+	fn_type := val.Type()
+	variadic := fn_type.IsVariadic()
+	checks := make([]ArgCheck, fn_type.NumIn())
+
+	arg_count := fn_type.NumIn()
+
+	for i := 0 ; i < arg_count ; i++ {
+		t := fn_type.In(i)
+
+		if variadic && i == arg_count { t = t.Elem() }
+
+		switch t.Kind() {
+		case reflect.Int: checks[i] = NumCheck[int]
+		case reflect.Int8: checks[i] = NumCheck[int8]
+		case reflect.Int16: checks[i] = NumCheck[int16]
+		case reflect.Int32: checks[i] = NumCheck[int32]
+		case reflect.Int64: checks[i] = NumCheck[int64]
+		case reflect.Uint: checks[i] = NumCheck[uint]
+		case reflect.Uint8: checks[i] = NumCheck[uint8]
+		case reflect.Uint16: checks[i] = NumCheck[uint16]
+		case reflect.Uint32: checks[i] = NumCheck[uint32]
+		case reflect.Uint64: checks[i] = NumCheck[uint64]
+		case reflect.Float32: checks[i] = NumCheck[float32]
+		case reflect.Float64: checks[i] = NumCheck[float64]
+		case reflect.String: checks[i] = StrCheck
+		case reflect.Bool: checks[i] = BoolCheck
+		default:
+			return errors.New("No check installed for argument type: " + t.String())
+		}
+	}
+
 	lw.l.SetGlobal(name, lw.l.NewFunction(func (l *lua.LState) int {
-		args := GetArgs(l)
-		lv, err := MakeLValue(fn(args...))
-		if err != nil { println("error calling", name, ":", err.Error()) }
-		l.Push(lv)
-		return 1
+		args, err := checkArgs(GetArgs(l), variadic, checks)
+		if err != nil {
+			l.Error(lua.LString(err.Error()), 0)
+			return 0
+		}
+
+		results := val.Call(args)
+		for _, result := range results {
+			val, err := makeLValue(result.Interface())
+			if err != nil {
+				l.Error(lua.LString(err.Error()), 0)
+				return 0
+			}
+			l.Push(val)
+		}
+
+		if len(results) == 0 {
+			l.Push(nil)
+			return 1
+		}
+
+		return len(results)
 	}))
+
+	return nil
 }
 
 func (lw *LuaWidget) Init() error {
@@ -120,12 +223,7 @@ func (lw *LuaWidget) Init() error {
 	err = lw.l.PCall(0, lua.MultRet, nil)
 	if err != nil { return err }
 
-	lw.ExposeFn("Button", func (args ...lua.LValue) any {
-		if len(args) != 1 { return errors.New(fmt.Sprintln("Button: Expected exactly 1 arg, got", len(args))) }
-		text, err := LValStr(args[0])
-		if err != nil { return errors.New("Button: " + err.Error()) }
-		return ui.TextButton(text)
-	})
+	lw.exposeFn("Button", ui.TextButton)
 
 	initfn, err := getLuaFn(lw.l, "init", false)
 	if err != nil { return err }
