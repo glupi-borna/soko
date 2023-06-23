@@ -1,4 +1,7 @@
+local count = 0
 function frame()
-    print("Hello")
-    trace("go Hello")
+    if Button("Click me") then
+        count = count + 1
+        print("Clicked " .. count .. " times")
+    end
 end

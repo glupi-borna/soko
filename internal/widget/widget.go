@@ -1,12 +1,14 @@
 package widget
 
 import (
+	"reflect"
 	"fmt"
 	"io/ioutil"
 	"path"
 	"strings"
 	"errors"
 	"github.com/yuin/gopher-lua"
+	"github.com/glupi-borna/wiggo/internal/ui"
 )
 
 type Widget interface {
@@ -54,6 +56,60 @@ func getLuaFn(l *lua.LState, name string, required bool) (*lua.LFunction, error)
 func (lw *LuaWidget) Name() string { return lw.name }
 func (lw *LuaWidget) Path() string { return lw.path }
 func (lw *LuaWidget) Type() string { return "lua" }
+
+func GetArgs(l *lua.LState) []lua.LValue {
+	top := l.GetTop()
+	args := make([]lua.LValue, top)
+	for i := 0; i < top ; i++ {
+		v := l.Get(i+1)
+		args[i] = v
+	}
+	return args
+}
+
+func LValStr(val lua.LValue) (string, error) {
+	v, ok := val.(lua.LString)
+	if ok { return v.String(), nil }
+	return "", errors.New("Expected a string, got " + val.Type().String())
+}
+
+func MakeLValue(val any) (lua.LValue, error) {
+	switch v := val.(type) {
+	case nil: return lua.LNil, nil
+	case string: return lua.LString(v), nil
+
+	case bool: return lua.LBool(v), nil
+
+	case float32: return lua.LNumber(v), nil
+	case float64: return lua.LNumber(v), nil
+	case int8: return lua.LNumber(v), nil
+	case int16: return lua.LNumber(v), nil
+	case int32: return lua.LNumber(v), nil
+	case int64: return lua.LNumber(v), nil
+	case uint8: return lua.LNumber(v), nil
+	case uint16: return lua.LNumber(v), nil
+	case uint32: return lua.LNumber(v), nil
+	case uint64: return lua.LNumber(v), nil
+
+	case error: return lua.LNil, v
+
+	default:
+		t := reflect.TypeOf(v)
+		println("Unsupported return value in function call: ", t.String())
+		return lua.LNil, nil
+	}
+}
+
+func (lw *LuaWidget) ExposeFn(name string, fn func (args ...lua.LValue) any) {
+	lw.l.SetGlobal(name, lw.l.NewFunction(func (l *lua.LState) int {
+		args := GetArgs(l)
+		lv, err := MakeLValue(fn(args...))
+		if err != nil { println("error calling", name, ":", err.Error()) }
+		l.Push(lv)
+		return 1
+	}))
+}
+
 func (lw *LuaWidget) Init() error {
 	lw.l = lua.NewState()
 
@@ -64,16 +120,12 @@ func (lw *LuaWidget) Init() error {
 	err = lw.l.PCall(0, lua.MultRet, nil)
 	if err != nil { return err }
 
-	lw.l.SetGlobal("trace", lw.l.NewFunction(func (l *lua.LState) int {
-		top := l.GetTop()
-		args := make([]any, top)
-		for i := 0; i < top ; i++ {
-			v := l.Get(i+1)
-			args[i] = v
-		}
-		fmt.Println(args...)
-		return 0
-	}))
+	lw.ExposeFn("Button", func (args ...lua.LValue) any {
+		if len(args) != 1 { return errors.New(fmt.Sprintln("Button: Expected exactly 1 arg, got", len(args))) }
+		text, err := LValStr(args[0])
+		if err != nil { return errors.New("Button: " + err.Error()) }
+		return ui.TextButton(text)
+	})
 
 	initfn, err := getLuaFn(lw.l, "init", false)
 	if err != nil { return err }
