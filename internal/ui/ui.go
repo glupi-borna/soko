@@ -138,7 +138,7 @@ func (ui *ui_state) Begin() {
 	ui.Reset()
 	ui.Root = GetNode("root", nil)
 	ui.Root.UpdateFn = rootUpdateFn
-	ui.Root.RenderFn = invisibleRenderFn
+	ui.Root.RenderFn = rootRenderFn
 	ui.Root.Size.W = Px(WindowWidth())
 	ui.Root.Size.H = Px(WindowHeight())
 	ui.Current = ui.Root

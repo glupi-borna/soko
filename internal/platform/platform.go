@@ -37,20 +37,26 @@ func (p *platform) Init(x, y, w, h int32) {
 		sdl.WINDOW_SHOWN |
 		sdl.WINDOW_BORDERLESS |
 		sdl.WINDOW_UTILITY |
+		// NOTE: if this flag is not provided, shaped
+		// windows do not work - presumably because the
+		// window gets recreated.
+		sdl.WINDOW_OPENGL |
 		sdl.WINDOW_ALWAYS_ON_TOP
 
 	sdl.SetHint("SDL_X11_FORCE_OVERRIDE_REDIRECT", "1")
+	sdl.SetHint(sdl.HINT_FRAMEBUFFER_ACCELERATION, "0")
 	sdl.GLSetAttribute(sdl.GL_MULTISAMPLESAMPLES, 4)
 	sdl.GLSetAttribute(sdl.GL_MULTISAMPLEBUFFERS, 1)
 
-	window, err := sdl.CreateWindow(
-		"", x, y, w, h, window_flags)
+	window, err := sdl.CreateShapedWindow("", uint32(x), uint32(y), uint32(w), uint32(h), window_flags)
 	Die(err)
 	p.Window = window
 
 	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_PRESENTVSYNC | sdl.RENDERER_ACCELERATED)
 	Die(err)
 	p.Renderer = renderer
+
+	p.Window.SetPosition(300, 300)
 
 	font, err := ttf.OpenFont(fontPath, fontSize)
 	Die(err)

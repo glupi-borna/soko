@@ -187,6 +187,8 @@ func main() {
 			}*/
 		} ; UI.End()
 
+		UI.Root.Style = DefaultStyle.Copy()
+		UI.Root.Style.CornerRadius.Normal = 32
 		UI.Render()
 		Platform.Renderer.Present()
 
