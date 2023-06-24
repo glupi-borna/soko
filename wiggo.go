@@ -4,7 +4,6 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"strings"
-	"errors"
 	"runtime"
 	"flag"
 	"os"
@@ -85,10 +84,6 @@ func main() {
 	}
 
 	widget_name = flag.Arg(0)
-
-	if widget_name == "" {
-		Die(errors.New("Widget name not provided!"))
-	}
 
 	w, err := widget.Load(widget_name)
 	Die(err)
