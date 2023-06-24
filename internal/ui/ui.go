@@ -143,6 +143,7 @@ func (ui *UI_State) Begin() {
 	ui.Root.RenderFn = rootRenderFn
 	ui.Root.Size.W = Px(WindowWidth())
 	ui.Root.Size.H = Px(WindowHeight())
+	ui.Root.Style = &DefaultStyle
 	ui.Current = ui.Root
 }
 
@@ -151,7 +152,6 @@ func (ui *UI_State) End() {
 		panic("Unbalanced UI stack!")
 	}
 
-	ui.Root.Style = &DefaultStyle
 	ui.Root.ResolveStandalone()
 	ui.Root.ResolveUpwards()
 	ui.Root.ResolveDownwards()

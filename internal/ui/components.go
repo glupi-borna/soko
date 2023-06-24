@@ -111,7 +111,6 @@ func sliderUpdateFn(n *Node) {
 		if n.UID == n.UI.Hot {
 			new_perc := Clamp((Platform.MousePos.X - n.Pos.X) / n.RealSize.X, 0, 1)
 			n.Set("perc", new_perc)
-			n.Set("perc-changed", true)
 		}
 
 		if n.HasMouse() {
@@ -251,12 +250,13 @@ func Slider(val, min, max float32) (float32, *Node) {
 	n.Style = SliderStyle
 	n.Size.W = Px(200)
 
-	perc := Clamp(val - min, 0, diff) / diff
-	if uiGet(n, "perc-changed", false) {
+
+	var perc float32
+	if n.UID == CurrentUI.Hot {
 		perc = uiGet(n, "perc", perc)
 	} else {
+		perc = Clamp(val - min, 0, diff) / diff
 		n.Set("perc", perc)
-		n.Set("perc-changed", false)
 	}
 
 	return (perc*diff)+min, n

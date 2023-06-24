@@ -18,11 +18,21 @@ func DrawRectFilled(x, y, w, h float32) {
 	Platform.Renderer.FillRectF(&sdl.FRect{x, y, w, h})
 }
 
+var ARCPOINTS = make([]sdl.FPoint, 0)
+
+func maybe_resize[K any](arr *[]K, size int) {
+	if cap(*arr) < size {
+		*arr = make([]K, size*2)
+	} else {
+		*arr = (*arr)[:size]
+	}
+}
 
 func ArcPoints(x, y, r, startAngle, endAngle float32) []sdl.FPoint {
 	CORNER_POINTS := cornerPointsCount(r)
 
-	points := make([]sdl.FPoint, CORNER_POINTS)
+	maybe_resize(&ARCPOINTS, CORNER_POINTS)
+
 	angleRange := float64(Abs(startAngle - endAngle))
 	start := float64(startAngle)
 	rad := float64(r)
@@ -34,32 +44,34 @@ func ArcPoints(x, y, r, startAngle, endAngle float32) []sdl.FPoint {
 		angle := frac*angleRange + start
 		xoff := float32(math.Cos(angle) * rad)
 		yoff := float32(math.Sin(angle) * rad)
-		points[i].X = x+xoff
-		points[i].Y = y+yoff
+		ARCPOINTS[i].X = x+xoff
+		ARCPOINTS[i].Y = y+yoff
 	}
 
-	return points
+	return ARCPOINTS
 }
+
+var RRPOINTS = make([]sdl.FPoint, 0)
 
 func RoundRectPoints(x, y, w, h, r float32) []sdl.FPoint {
 	r = Clamp(r, 0, Min(w/2, h/2))
 
-	CORNER_POINTS := cornerPointsCount(r)
-	TOTAL_POINTS := CORNER_POINTS * 4
+	// CORNER_POINTS := cornerPointsCount(r)
+	// TOTAL_POINTS := CORNER_POINTS * 4
 
 	x1 := x+r
 	y1 := y+r
 	x2 := x+w-r
 	y2 := y+h-r
 
-	points := make([]sdl.FPoint, 0, TOTAL_POINTS)
+	RRPOINTS = RRPOINTS[:0]
 	const pihalf = math.Pi/2
-	points = append(points, ArcPoints(x1, y1, r, pihalf*2, pihalf*3)...)
-	points = append(points, ArcPoints(x2, y1, r, pihalf*3, pihalf*4)...)
-	points = append(points, ArcPoints(x2, y2, r, 0,        pihalf)...)
-	points = append(points, ArcPoints(x1, y2, r, pihalf,   pihalf*2)...)
+	RRPOINTS = append(RRPOINTS, ArcPoints(x1, y1, r, pihalf*2, pihalf*3)...)
+	RRPOINTS = append(RRPOINTS, ArcPoints(x2, y1, r, pihalf*3, pihalf*4)...)
+	RRPOINTS = append(RRPOINTS, ArcPoints(x2, y2, r, 0,        pihalf)...)
+	RRPOINTS = append(RRPOINTS, ArcPoints(x1, y2, r, pihalf,   pihalf*2)...)
 
-	return points
+	return RRPOINTS
 }
 
 // Calculates ideal number of points for 90 degree
@@ -86,6 +98,8 @@ func DrawRoundRectOutlined(x, y, w, h, r float32) {
 	Platform.Renderer.DrawLineF(points[0].X, points[0].Y, points[l].X, points[l].Y)
 }
 
+var RRVERTS = make([]sdl.Vertex, 0)
+
 func DrawRoundRectFilled(x, y, w, h, r float32) {
 	R,G,B,A,_ := Platform.Renderer.GetDrawColor()
 	c := sdl.Color{R,G,B,A}
@@ -93,24 +107,24 @@ func DrawRoundRectFilled(x, y, w, h, r float32) {
 	points := RoundRectPoints(x, y, w, h, r)
 	point_count := len(points)
 
-	verts := make([]sdl.Vertex, point_count*3)
-	for i := range verts { verts[i] = sdl.Vertex{Color: c} }
+	maybe_resize(&RRVERTS, point_count*3)
+	for i := range RRVERTS { RRVERTS[i] = sdl.Vertex{Color: c} }
 
 	midx := x+w/2
 	midy := y+h/2
 
 	for i:=0 ; i<point_count ; i++ {
 		idx := i*3
-		verts[idx].Position.X = points[i].X
-		verts[idx].Position.Y = points[i].Y
+		RRVERTS[idx].Position.X = points[i].X
+		RRVERTS[idx].Position.Y = points[i].Y
 
-		verts[idx+1].Position.X = midx
-		verts[idx+1].Position.Y = midy
+		RRVERTS[idx+1].Position.X = midx
+		RRVERTS[idx+1].Position.Y = midy
 
 		next_i := (i+1)%point_count
-		verts[idx+2].Position.X = points[next_i].X
-		verts[idx+2].Position.Y = points[next_i].Y
+		RRVERTS[idx+2].Position.X = points[next_i].X
+		RRVERTS[idx+2].Position.Y = points[next_i].Y
 	}
 
-	Platform.Renderer.RenderGeometry(nil, verts, nil)
+	Platform.Renderer.RenderGeometry(nil, RRVERTS, nil)
 }

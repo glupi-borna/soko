@@ -75,7 +75,6 @@ var DefaultStyle = Style{
 	Foreground: StyleVar(Col(255)),
 	Background: StyleVar(ColHex(0x0)),
 	Border: StyleVar(ColHex(0x0)),
-	CornerRadius: StyleVar[float32](3),
 }
 
 var ButtonStyle = Style{

@@ -177,6 +177,10 @@ func rootRenderFn(n *Node) {
 
 	rerender := last_radius != radius
 
+	c := n.Style.Background.Normal
+	SetColor(c)
+	DrawRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+
 	if shape == nil {
 		free = false
 		recreate = true
@@ -200,23 +204,27 @@ func rootRenderFn(n *Node) {
 
 	if rerender {
 		shape.FillRect(nil, 0)
-		pxls := shape.Pixels()
-		ir := int32(radius)
-		rsq := ir*ir
-		bpp := int32(shape.BytesPerPixel())
 
-		for x := -ir; x < ir ; x++ {
-			xsq := x*x
-			for y := -ir; y < ir ; y++ {
-				if xsq + y*y < rsq {
-					i := shape.Pitch * (y+ir) + bpp * (x+ir)
-					pxls[i] = 255
-					i = shape.Pitch * (y+ir) + bpp * (x+w-ir)
-					pxls[i] = 255
-					i = shape.Pitch * (y+h-ir) + bpp * (x+ir)
-					pxls[i] = 255
-					i = shape.Pitch * (y+h-ir) + bpp * (x+w-ir)
-					pxls[i] = 255
+		ir := int32(radius)
+
+		if radius > 0 {
+			pxls := shape.Pixels()
+			rsq := ir*ir
+			bpp := int32(shape.BytesPerPixel())
+
+			for x := -ir; x < ir ; x++ {
+				xsq := x*x
+				for y := -ir; y < ir ; y++ {
+					if xsq + y*y < rsq {
+						i := shape.Pitch * (y+ir) + bpp * (x+ir)
+						pxls[i] = 255
+						i = shape.Pitch * (y+ir) + bpp * (x+w-ir-1)
+						pxls[i] = 255
+						i = shape.Pitch * (y+h-ir-1) + bpp * (x+ir)
+						pxls[i] = 255
+						i = shape.Pitch * (y+h-ir-1) + bpp * (x+w-ir-1)
+						pxls[i] = 255
+					}
 				}
 			}
 		}

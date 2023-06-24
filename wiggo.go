@@ -1,12 +1,11 @@
 package main
 
 import (
+	"net/http"
+	_ "net/http/pprof"
 	"errors"
-	// "strconv"
 	"runtime"
 	"flag"
-	"os"
-	"runtime/pprof"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 	. "github.com/glupi-borna/wiggo/internal/utils"
@@ -17,7 +16,7 @@ import (
 
 var widget_name = flag.String("widget", "", "name of the widget to load")
 
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+var profile = flag.Bool("profile", false, "run profiling webserver")
 var timeout = flag.Uint64("timeout", 0, "stop running after this number of milliseconds (0 = no timeout)")
 var vsync = flag.Bool("vsync", true, "enable/disable vsync")
 var override_redirect = flag.Bool("override-redirect", true, "enable/disable override-redirect (X11)")
@@ -49,11 +48,13 @@ func main() {
 	flag.Var(window_anchor, "window-anchor", "Position the window anchor (center or top-left)")
 
 	flag.Parse()
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		Die(err)
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
+	if *profile {
+		go func() {
+			err := http.ListenAndServe("localhost:6060", nil)
+			if err != nil {
+				println(err.Error())
+			}
+		}()
 	}
 
 	if widget_name == nil || *widget_name == "" {
@@ -89,6 +90,8 @@ func main() {
 	defer func() {
 		Die(w.Cleanup())
 	}()
+
+	last_err_text := ""
 
 	for running {
 		FrameStart := sdl.GetTicks64()
@@ -139,7 +142,21 @@ func main() {
 		Platform.Renderer.SetDrawColor(255, 0, 0, 255)
 
 		UI.Begin(); {
-			Die(w.Frame())
+			err := w.Frame()
+			if err != nil {
+				if err.Error() != last_err_text {
+					last_err_text = err.Error()
+					println(last_err_text)
+				}
+				UI.Root.Children = nil
+				UI.Current = UI.Root
+				UI.Root.Style = DefaultStyle.Copy()
+				UI.Root.Style.Background = StyleVar(ColHex(0xff0000ff))
+				WithNode(Column(), func(n *Node) {
+					Text("Error in " + w.Name())//.Styled().Foreground = StyleVar(Col(255))
+					Text("Check output for trace")//.Styled().Foreground = StyleVar(Col(255))
+				})
+			}
 			/*Text(FloatStr(float64(FrameTime)/1000) + "ms")
 
 			WithNode(Row(), func(n *Node) {
@@ -188,8 +205,6 @@ func main() {
 			}*/
 		} ; UI.End()
 
-		UI.Root.Style = DefaultStyle.Copy()
-		UI.Root.Style.CornerRadius.Normal = 32
 		UI.Render()
 		Platform.Renderer.Present()
 		// FrameTime = FrameStart - LastFrameStart
