@@ -30,6 +30,7 @@ type platform struct {
 	MouseDelta V2
 	Keyboard map[uint32]BUTTON_STATE
 	AnyKeyPressed bool
+	Close func()
 }
 
 func (p *platform) Init(x, y, w, h int32) {
@@ -43,6 +44,11 @@ func (p *platform) Init(x, y, w, h int32) {
 		sdl.WINDOW_OPENGL |
 		sdl.WINDOW_ALWAYS_ON_TOP
 
+	var renderer_flags uint32 =
+		sdl.RENDERER_PRESENTVSYNC |
+		sdl.RENDERER_ACCELERATED |
+		sdl.RENDERER_TARGETTEXTURE
+
 	sdl.SetHint("SDL_X11_FORCE_OVERRIDE_REDIRECT", "1")
 	sdl.SetHint(sdl.HINT_FRAMEBUFFER_ACCELERATION, "0")
 	sdl.GLSetAttribute(sdl.GL_MULTISAMPLESAMPLES, 4)
@@ -52,7 +58,7 @@ func (p *platform) Init(x, y, w, h int32) {
 	Die(err)
 	p.Window = window
 
-	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_PRESENTVSYNC | sdl.RENDERER_ACCELERATED)
+	renderer, err := sdl.CreateRenderer(window, -1, renderer_flags)
 	Die(err)
 	p.Renderer = renderer
 

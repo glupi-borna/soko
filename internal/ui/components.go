@@ -132,7 +132,10 @@ func sliderUpdateFn(n *Node) {
 	}
 }
 
-func invisibleRenderFn(*Node) {}
+func invisibleRenderFn(n *Node) {
+	SetColor(sdl.Color{255, 0, 0, 255})
+	DrawRectOutlined(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+}
 
 func WithNode(n *Node, fn func(*Node)) *Node {
 	fn(n)
@@ -192,6 +195,7 @@ func Invisible(dim Dimension) *Node {
 	defer CurrentUI.Pop(n)
 	n.Size.W = dim
 	n.Size.H = dim
+	n.Padding = Padding{}
 	n.RenderFn = invisibleRenderFn
 	return n
 }

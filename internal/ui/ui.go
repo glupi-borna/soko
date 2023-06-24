@@ -6,10 +6,10 @@ import (
 
 type NodeData map[string] any
 
-var CurrentUI *ui_state
+var CurrentUI *UI_State
 
-func MakeUI() *ui_state {
-	ui := &ui_state{
+func MakeUI() *UI_State {
+	ui := &UI_State{
 		Data: make(map[string]NodeData, 1000),
 		AnimState: make(map[string]float32, 100),
 	}
@@ -76,7 +76,7 @@ const (
 	IM_KBD
 )
 
-type ui_state struct {
+type UI_State struct {
 	Mode INPUT_MODE
 
 	Data map[string]NodeData
@@ -84,6 +84,7 @@ type ui_state struct {
 
 	Root *Node
 	Current *Node
+	Last *Node
 
 	Active string
 	Hot    string
@@ -92,25 +93,26 @@ type ui_state struct {
 	HotChanged    bool
 }
 
-func (ui *ui_state) Reset() {
+func (ui *UI_State) Reset() {
 	ui.ActiveChanged = false
 	ui.HotChanged = false
 }
 
 // Pushes a node on the UI stack.
-func (ui *ui_state) Push(t string) (n *Node) {
+func (ui *UI_State) Push(t string) (n *Node) {
 	n = GetNode(t, CurrentUI.Current)
 	ui.Current = n
+	ui.Last = n
 	return
 }
 
 // Pops a node off the UI stack.
-func (ui *ui_state) Pop(n *Node) *Node {
+func (ui *UI_State) Pop(n *Node) *Node {
 	ui.Current = n.Parent
 	return n
 }
 
-func (ui *ui_state) SetActive(node *Node, force bool) {
+func (ui *UI_State) SetActive(node *Node, force bool) {
 	if ui.ActiveChanged && !force { return }
 	if ui.Hot != "" { return }
 
@@ -123,7 +125,7 @@ func (ui *ui_state) SetActive(node *Node, force bool) {
 	ui.ActiveChanged = true
 }
 
-func (ui *ui_state) SetHot(node *Node, force bool) {
+func (ui *UI_State) SetHot(node *Node, force bool) {
 	if ui.HotChanged && !force { return }
 	if node == nil {
 		ui.Hot = ""
@@ -133,7 +135,7 @@ func (ui *ui_state) SetHot(node *Node, force bool) {
 	ui.HotChanged = true
 }
 
-func (ui *ui_state) Begin() {
+func (ui *UI_State) Begin() {
 	CurrentUI = ui
 	ui.Reset()
 	ui.Root = GetNode("root", nil)
@@ -144,7 +146,7 @@ func (ui *ui_state) Begin() {
 	ui.Current = ui.Root
 }
 
-func (ui *ui_state) End() {
+func (ui *UI_State) End() {
 	if ui.Current != ui.Root {
 		panic("Unbalanced UI stack!")
 	}
@@ -162,6 +164,6 @@ func (ui *ui_state) End() {
 	ui.Root.UpdateFn(ui.Root)
 }
 
-func (ui *ui_state) Render() {
+func (ui *UI_State) Render() {
 	ui.Root.Render()
 }

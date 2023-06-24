@@ -84,7 +84,7 @@ type Node struct {
 	UpdateFn func(*Node)
 
 	// The UI State object associated with this node
-	UI *ui_state
+	UI *UI_State
 }
 
 // Currently does the same as MakeNode, but
@@ -238,6 +238,12 @@ func rootRenderFn(n *Node) {
 	}
 }
 
+func (n *Node) Styled() *Style {
+	if n.Style != nil { return n.Style }
+	n.Style = DefaultStyle.Copy()
+	return n.Style
+}
+
 func (n *Node) CountChildrenOfType(t string) int {
 	count := 0
 	for _, child := range n.Children {
@@ -285,26 +291,30 @@ func (n *Node) yFracs() float32 {
 	return count
 }
 
-var autoMap = map[string]Dimension{
-	"text": FitText(),
+var autoMap = map[string]Size{
+	"text": Size{FitText(), FitText()},
+	"row": Size{Fr(1), ChildrenSize()},
+	"column": Size{ChildrenSize(), Fr(1)},
 }
 
 func ResolveAuto(n *Node) {
-	if n.Size.W.Type == DT_AUTO {
-		dim, ok := autoMap[n.Type]
-		if !ok {
-			n.Size.W = ChildrenSize()
-		} else {
-			n.Size.W = dim
-		}
-	}
+	if n.Size.W.Type == DT_AUTO || n.Size.H.Type == DT_AUTO {
+		size, ok := autoMap[n.Type]
 
-	if n.Size.H.Type == DT_AUTO {
-		dim, ok := autoMap[n.Type]
-		if !ok {
-			n.Size.H = ChildrenSize()
-		} else {
-			n.Size.H = dim
+		if n.Size.W.Type == DT_AUTO {
+			if !ok {
+				n.Size.W = ChildrenSize()
+			} else {
+				n.Size.W = size.W
+			}
+		}
+
+		if n.Size.H.Type == DT_AUTO {
+			if !ok {
+				n.Size.H = ChildrenSize()
+			} else {
+				n.Size.H = size.H
+			}
 		}
 	}
 }
@@ -338,7 +348,7 @@ func (n *Node) ResolveStandalone() {
 	}
 }
 
-// Resolves upwards-dependent sizes
+// Resolves parent-dependent sizes
 func (n *Node) ResolveUpwards() {
 	if !n.IsWidthResolved && n.Size.W.Type == DT_FR {
 		pw := n.ParentRemainingWidth()
@@ -371,7 +381,7 @@ func (n *Node) ResolveUpwards() {
 	}
 }
 
-// Resolves downwards-dependent sizes
+// Resolves child-dependent sizes
 func (n *Node) ResolveDownwards() {
 	for _, child := range n.Children {
 		child.ResolveDownwards()
@@ -415,10 +425,13 @@ func (n *Node) ResolveViolations() {
 		h = n.ChildMax(nodeRealY)
 	}
 
-	if w > n.RealSize.X {
+	total_width := w + n.Padding.Left + n.Padding.Right
+	total_height := h + n.Padding.Top + n.Padding.Bottom
+
+	if total_width > n.RealSize.X {
 		fracs := n.xFracs()
 		if fracs > 0 {
-			fracdec := (w - n.RealSize.X) / fracs
+			fracdec := (total_width - n.RealSize.X) / fracs
 			for _, child := range n.Children {
 				if child.Size.W.Type == DT_FR {
 					child.RealSize.X -= fracdec * child.Size.W.Amount
@@ -427,10 +440,10 @@ func (n *Node) ResolveViolations() {
 		}
 	}
 
-	if h > n.RealSize.Y {
+	if total_height > n.RealSize.Y {
 		fracs := n.yFracs()
 		if fracs > 0 {
-			fracdec := (h - n.RealSize.Y) / fracs
+			fracdec := (total_height - n.RealSize.Y) / fracs
 			for _, child := range n.Children {
 				if child.Size.H.Type == DT_FR {
 					child.RealSize.Y -= fracdec * child.Size.H.Amount

@@ -9,7 +9,9 @@ import (
 	"strings"
 	"errors"
 	"github.com/yuin/gopher-lua"
+	"layeh.com/gopher-luar"
 	"github.com/glupi-borna/wiggo/internal/ui"
+	"github.com/glupi-borna/wiggo/internal/platform"
 	. "github.com/glupi-borna/wiggo/internal/utils"
 )
 
@@ -71,22 +73,46 @@ func GetArgs(l *lua.LState) []lua.LValue {
 
 type ArgCheck func (val lua.LValue) (any, error)
 
+type Stringable interface { String() string }
+
+func ExpectedErr(expected string, got Stringable) error {
+	return errors.New("Expected <" + expected + ">, got <" + got.String() + ">")
+}
+
 func NumCheck[V constraints.Float | constraints.Integer](val lua.LValue) (any, error) {
 	v, ok := val.(lua.LNumber)
 	if ok { return V(v), nil }
-	return "", errors.New("Expected a string, got " + val.Type().String())
+	return 0, ExpectedErr("number", val.Type())
 }
 
 func StrCheck(val lua.LValue) (any, error) {
 	v, ok := val.(lua.LString)
 	if ok { return v.String(), nil }
-	return "", errors.New("Expected a string, got " + val.Type().String())
+	return "", ExpectedErr("string", val.Type())
 }
 
 func BoolCheck(val lua.LValue) (any, error) {
 	v, ok := val.(lua.LBool)
 	if ok { return bool(v), nil }
-	return false, errors.New("Expected a string, got " + val.Type().String())
+	return false, ExpectedErr("bool", val.Type())
+}
+
+func StructPtrCheck(val lua.LValue) (any, error) {
+	if val == lua.LNil { return nil, nil }
+	v, ok := val.(*lua.LUserData)
+	if !ok { return nil, ExpectedErr("UserData", val.Type()) }
+	vval := reflect.ValueOf(v.Value)
+	if vval.Kind() != reflect.Ptr { return nil, ExpectedErr("Pointer", vval) }
+	el := vval.Elem()
+	if el.IsZero() { return nil, nil }
+	if el.Kind() != reflect.Struct { return nil, ExpectedErr("Struct", el)}
+	return v.Value, nil
+}
+
+func FuncCheck(val lua.LValue) (any, error) {
+	v, ok := val.(*lua.LFunction)
+	if ok { return v.GFunction, nil }
+	return nil, ExpectedErr("function", val.Type())
 }
 
 func checkArgs(
@@ -144,9 +170,7 @@ func makeLValue(val any) (lua.LValue, error) {
 	case error: return lua.LNil, v
 
 	default:
-		t := reflect.TypeOf(v)
-		println("Unsupported return value in function call: ", t.String())
-		return lua.LNil, nil
+		return &lua.LUserData{Value: v}, nil
 	}
 }
 
@@ -180,6 +204,8 @@ func (lw *LuaWidget) exposeFn(name string, fn any) error {
 		case reflect.Float64: checks[i] = NumCheck[float64]
 		case reflect.String: checks[i] = StrCheck
 		case reflect.Bool: checks[i] = BoolCheck
+		case reflect.Pointer: checks[i] = StructPtrCheck
+		case reflect.Func: checks[i] = FuncCheck
 		default:
 			return errors.New("No check installed for argument type: " + t.String())
 		}
@@ -213,6 +239,11 @@ func (lw *LuaWidget) exposeFn(name string, fn any) error {
 	return nil
 }
 
+func ReportError(err error) {
+	if err == nil { return }
+	println(err.Error())
+}
+
 func (lw *LuaWidget) Init() error {
 	lw.l = lua.NewState()
 
@@ -223,7 +254,21 @@ func (lw *LuaWidget) Init() error {
 	err = lw.l.PCall(0, lua.MultRet, nil)
 	if err != nil { return err }
 
-	lw.exposeFn("Button", ui.TextButton)
+	lw.l.SetGlobal("UI", luar.New(lw.l, func() *ui.UI_State { return ui.CurrentUI }))
+	lw.l.SetGlobal("TextButton", luar.New(lw.l, ui.TextButton))
+	lw.l.SetGlobal("Text", luar.New(lw.l, ui.Text))
+	lw.l.SetGlobal("Animate", luar.New(lw.l, ui.Animate))
+	lw.l.SetGlobal("Column", luar.New(lw.l, ui.Column))
+	lw.l.SetGlobal("Row", luar.New(lw.l, ui.Row))
+	lw.l.SetGlobal("Button", luar.New(lw.l, ui.Button))
+	lw.l.SetGlobal("Invisible", luar.New(lw.l, ui.Invisible))
+	lw.l.SetGlobal("With", luar.New(lw.l, ui.WithNode))
+	lw.l.SetGlobal("Fr", luar.New(lw.l, ui.Fr))
+	lw.l.SetGlobal("Px", luar.New(lw.l, ui.Px))
+	lw.l.SetGlobal("Auto", luar.New(lw.l, ui.Auto))
+	lw.l.SetGlobal("ChildrenSize", luar.New(lw.l, ui.ChildrenSize))
+	lw.l.SetGlobal("FitText", luar.New(lw.l, ui.FitText))
+	lw.l.SetGlobal("Close", luar.New(lw.l, platform.Platform.Close))
 
 	initfn, err := getLuaFn(lw.l, "init", false)
 	if err != nil { return err }

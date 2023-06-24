@@ -73,10 +73,11 @@ func main() {
 	Die(err)
 	defer ttf.Quit()
 
-	Platform.Init(int32(*window_x), int32(*window_y), 200, 200)
-	UI := MakeUI()
-
 	running := true
+	Platform.Init(int32(*window_x), int32(*window_y), 200, 200)
+	Platform.Close = func() { running = false }
+
+	UI := MakeUI()
 
 	// LastFrameStart := uint64(0)
 	// FrameTime := uint64(0)
@@ -191,7 +192,6 @@ func main() {
 		UI.Root.Style.CornerRadius.Normal = 32
 		UI.Render()
 		Platform.Renderer.Present()
-
 		// FrameTime = FrameStart - LastFrameStart
 		// LastFrameStart = FrameStart
 	}
@@ -199,7 +199,7 @@ func main() {
 
 func PrintTree(n *Node, indent string) {
 	child_indent := indent + "  "
-	println(indent + n.Type)
+	println(indent + n.Type, n.RealSize.String())
 	for _, child := range n.Children {
 		PrintTree(child, child_indent)
 	}
