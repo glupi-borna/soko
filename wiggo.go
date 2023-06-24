@@ -3,9 +3,11 @@ package main
 import (
 	"net/http"
 	_ "net/http/pprof"
+	"strings"
 	"errors"
 	"runtime"
 	"flag"
+	"os"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 	. "github.com/glupi-borna/wiggo/internal/utils"
@@ -14,38 +16,57 @@ import (
 	"github.com/glupi-borna/wiggo/internal/widget"
 )
 
-var widget_name = flag.String("widget", "", "name of the widget to load")
+var widget_name string
 
 var profile = flag.Bool("profile", false, "run profiling webserver")
 var timeout = flag.Uint64("timeout", 0, "stop running after this number of milliseconds (0 = no timeout)")
-var vsync = flag.Bool("vsync", true, "enable/disable vsync")
-var override_redirect = flag.Bool("override-redirect", true, "enable/disable override-redirect (X11)")
 
-var window_x = flag.Int("window-x", sdl.WINDOWPOS_UNDEFINED, "The x-position of the anchor of the window")
-var window_y = flag.Int("window-y", sdl.WINDOWPOS_UNDEFINED, "The y-position of the anchor of the window")
+var display = flag.Int(
+	"display", 0,
+	"The number of the display that the widget should appear on.\n"+
+	"-1 -> the display that currently contains the mouse cursor.")
+
+var anchor_x = flag.Int(
+	"x", 0,
+	"The x-position of the widget.\n"+
+	"Negative values are offset from the right side of the display.")
+
+var anchor_y = flag.Int(
+	"y", 0,
+	"The y-position of the widget\n"+
+	"Negative values are offset from the right side of the display.")
+
 var window_anchor WindowAnchorFlag
 
-type WindowAnchorFlag struct {
-	Anchor string
-}
+func UsageHandler() {
+	b := strings.Builder{}
+	b.WriteString("Usage: wiggo [options] widget_name\n")
+	b.WriteString("options:")
 
-func (w WindowAnchorFlag) String() string { return w.Anchor }
-func (w WindowAnchorFlag) Set(val string) error {
-	if val == "top-left" {
-		w.Anchor = val
-		return nil
-	}
+	flag.VisitAll(func (f *flag.Flag) {
+		b.WriteString("\n-")
+		b.WriteString(f.Name)
+		t, usage := flag.UnquoteUsage(f)
+		b.WriteString(" ")
+		b.WriteString(t)
+		usage_lines := strings.Split(usage, "\n")
+		for _, line := range usage_lines {
+			b.WriteString("\n\t")
+			b.WriteString(line)
+		}
+	})
 
-	if val == "center" {
-		w.Anchor = val
-		return nil
-	}
-
-	return errors.New("Unsupported window-anchor value: '" + val + "'")
+	println(b.String())
 }
 
 func main() {
-	flag.Var(window_anchor, "window-anchor", "Position the window anchor (center or top-left)")
+	flag.Usage = UsageHandler
+
+	flag.Var(window_anchor, "anchor",
+	"Alignment of the widget against it's position\n" +
+	"Supported values:\n" +
+	"	top-left\n" +
+	"	center")
 
 	flag.Parse()
 	if *profile {
@@ -57,11 +78,19 @@ func main() {
 		}()
 	}
 
-	if widget_name == nil || *widget_name == "" {
+	if flag.NArg() != 1 {
+		println("Widget name not provided!")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	widget_name = flag.Arg(0)
+
+	if widget_name == "" {
 		Die(errors.New("Widget name not provided!"))
 	}
 
-	w, err := widget.Load(*widget_name)
+	w, err := widget.Load(widget_name)
 	Die(err)
 
 	runtime.LockOSThread()
@@ -75,7 +104,12 @@ func main() {
 	defer ttf.Quit()
 
 	running := true
-	Platform.Init(int32(*window_x), int32(*window_y), 200, 200)
+	Platform.Init(PlatformInitOptions{
+		X: *anchor_x,
+		Y: *anchor_y,
+		Anchor: window_anchor,
+		Display: *display,
+	})
 	Platform.Close = func() { running = false }
 
 	UI := MakeUI()
