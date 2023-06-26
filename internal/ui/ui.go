@@ -2,6 +2,7 @@ package ui
 
 import (
 	. "github.com/glupi-borna/wiggo/internal/platform"
+	. "github.com/glupi-borna/wiggo/internal/debug"
 )
 
 type NodeData map[string] any
@@ -18,6 +19,8 @@ func MakeUI() *UI_State {
 
 // Smoothly animates a value
 func Animate(val float32, id string) float32 {
+	Assert(CurrentUI != nil, "UI not initialized!")
+
 	old, ok := CurrentUI.AnimState[id]
 	if !ok {
 		CurrentUI.AnimState[id] = val
@@ -57,6 +60,8 @@ func uiGet[K any](n *Node, key string, dflt K) (out K) {
 // Sets data for this node.
 // Returns true if the data has changed.
 func uiDataSet(n *Node, key string, val any) bool {
+	Assert(CurrentUI != nil, "UI not initialized!")
+
 	data, ok := CurrentUI.Data[n.UID]
 	if !ok {
 		data = make(NodeData)

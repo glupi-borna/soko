@@ -5,6 +5,7 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 	. "github.com/glupi-borna/wiggo/internal/utils"
 	. "github.com/glupi-borna/wiggo/internal/platform"
+	. "github.com/glupi-borna/wiggo/internal/debug"
 )
 
 type DIM_TYPE uint8
@@ -103,6 +104,8 @@ func buildNodeUID(n *Node) string {
 }
 
 func MakeNode(t string, parent *Node) *Node {
+	Assert(CurrentUI != nil, "UI not initialized!")
+
 	n := Node{
 		Type: t,
 		Children: make([]*Node, 0),
@@ -236,13 +239,16 @@ func rootRenderFn(n *Node) {
 
 		sdl.ClearError()
 		res := Platform.Window.SetShape(shape, sdl.ShapeModeDefault{})
-		switch res {
-		case sdl.NONSHAPEABLE_WINDOW: println("Nonshapeable window")
-		case sdl.INVALID_SHAPE_ARGUMENT: println("Invalid shape arg", shape)
-		case sdl.WINDOW_LACKS_SHAPE: println("Window lacks shape")
+
+		if DEBUG {
+			switch res {
+			case sdl.NONSHAPEABLE_WINDOW: Log("Nonshapeable window")
+			case sdl.INVALID_SHAPE_ARGUMENT: Log("Invalid shape arg", shape)
+			case sdl.WINDOW_LACKS_SHAPE: Log("Window lacks shape")
+			}
+			err = sdl.GetError()
+			if err != nil { Log(err.Error())}
 		}
-		err = sdl.GetError()
-		if err != nil { println(err.Error())}
 	}
 }
 
@@ -300,9 +306,9 @@ func (n *Node) yFracs() float32 {
 }
 
 var autoMap = map[string]Size{
-	"text": Size{FitText(), FitText()},
-	"row": Size{Fr(1), ChildrenSize()},
-	"column": Size{ChildrenSize(), Fr(1)},
+	"text": { FitText(), FitText() },
+	"row": { Fr(1), ChildrenSize() },
+	"column": { ChildrenSize(), Fr(1) },
 }
 
 func ResolveAuto(n *Node) {

@@ -12,6 +12,7 @@ import (
 	. "github.com/glupi-borna/wiggo/internal/utils"
 	. "github.com/glupi-borna/wiggo/internal/platform"
 	. "github.com/glupi-borna/wiggo/internal/ui"
+	. "github.com/glupi-borna/wiggo/internal/debug"
 	"github.com/glupi-borna/wiggo/internal/widget"
 )
 
