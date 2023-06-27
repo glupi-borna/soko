@@ -4,9 +4,12 @@ import (
 	"strconv"
 	"golang.org/x/exp/constraints"
 	"github.com/veandco/go-sdl2/sdl"
+	"math"
 )
 
 type V2 struct { X, Y float32 }
+
+var NaN32 = float32(math.NaN())
 
 func (v *V2) ManhattanLength() float32 {
 	return Abs(v.X) + Abs(v.Y)

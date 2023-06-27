@@ -1,16 +1,24 @@
-local radius = 0
+local volume = Volume()
 
 function SliderWidget()
-    if TextButton("-") then radius = radius - 1 end
+    volume = Volume()
+    local old_val = volume
+
+    if TextButton("-") then volume = volume - 0.05 end
+
     Invisible(Px(8))
 
-    radius = Slider(radius, 0, 32)
+    volume = Slider(volume, 0, 1)
+
     local slider = UI().Last
     slider.Size.W = Fr(1)
     slider.Size.H = Px(30)
 
     Invisible(Px(8))
-    if TextButton("+") then radius = radius + 1 end
+
+    if TextButton("+") then volume = volume - 0.05 end
+
+    if volume ~= old_vol then SetVolume(volume) end
 end
 
 function CloseRow()
@@ -20,21 +28,9 @@ function CloseRow()
 end
 
 function frame()
-    UI().Root.Style = Style{
-        Background = RGBA(255, 0, 0, 255),
-        CornerRadius = Animate(radius, "radius")
-    }
-
-    Text("Corner radius = " .. tostring(math.floor(radius+0.5))).Style = Style{
-        Foreground = ColHex(0xffffffff)
-    }
-
+    Text("Volume")
     for n in With(Row()) do
         n.Size.W = Fr(1)
         SliderWidget()
-    end
-
-    for n in With(Row()) do
-        CloseRow()
     end
 end

@@ -12,6 +12,7 @@ import (
 
 	"github.com/glupi-borna/wiggo/internal/ui"
 	"github.com/glupi-borna/wiggo/internal/platform"
+	"github.com/glupi-borna/wiggo/internal/sound"
 )
 
 type LuaWidget struct {
@@ -108,10 +109,6 @@ func (lw *LuaWidget) init() error {
 	fn, err := lw.l.LoadFile(lw.path)
 	if err != nil { return err }
 
-	lw.l.Push(fn)
-	err = lw.l.PCall(0, lua.MultRet, nil)
-	if err != nil { return err }
-
 	lw.l.SetGlobal("UI", luar.New(lw.l, func() *ui.UI_State { return ui.CurrentUI }))
 	lw.l.SetGlobal("TextButton", luar.New(lw.l, ui.TextButton))
 	lw.l.SetGlobal("Text", luar.New(lw.l, ui.Text))
@@ -190,6 +187,15 @@ func (lw *LuaWidget) init() error {
 
 		return s
 	}))
+
+	for key, val := range sound.WidgetFns {
+		lv := luar.New(lw.l, val)
+		lw.l.SetGlobal(key, lv)
+	}
+
+	lw.l.Push(fn)
+	err = lw.l.PCall(0, lua.MultRet, nil)
+	if err != nil { return err }
 
 	initfn, err := getLuaFn(lw.l, "init", false)
 	if err != nil { return err }
