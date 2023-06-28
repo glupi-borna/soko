@@ -4,7 +4,8 @@ BASEDIR="$(dirname "${BASH_SOURCE[0]}")"
 
 cd $BASEDIR/..
 go build wiggo.go
-./wiggo -cpuprofile wiggo.prof -timeout 100000
-go tool pprof -http localhost: wiggo wiggo.prof
+./wiggo -profile test &
+sleep 1
+go tool pprof -http localhost: wiggo localhost:6060/debug/pprof/heap
 rm -rf wiggo
-rm -rf wiggo.prof
+killall wiggo

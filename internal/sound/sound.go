@@ -10,8 +10,8 @@ import (
 	. "github.com/glupi-borna/wiggo/internal/utils"
 )
 
-// @TODO: Consider forking https://github.com/mafik/pulseaudio/ to add more
-// features here.
+// @TODO: Consider forking https://github.com/mafik/pulseaudio/ to add more features here.
+// @NOTE: https://github.com/mafik/pulseaudio/ has a memory leak in the `bread` function
 
 var pulseClient *pa.Client = nil
 

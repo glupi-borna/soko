@@ -22,6 +22,7 @@ type LuaWidget struct {
 	initFn *lua.LFunction
 	frameFn *lua.LFunction
 	cleanUpFn *lua.LFunction
+	reloadQueued bool
 }
 
 func MakeLuaWidget(name, path string) *LuaWidget {
@@ -117,6 +118,7 @@ func (lw *LuaWidget) init() error {
 	lw.l.SetGlobal("Row", luar.New(lw.l, ui.Row))
 	lw.l.SetGlobal("Button", luar.New(lw.l, ui.Button))
 	lw.l.SetGlobal("Slider", luar.New(lw.l, ui.Slider))
+	lw.l.SetGlobal("VSlider", luar.New(lw.l, ui.VSlider))
 	lw.l.SetGlobal("Invisible", luar.New(lw.l, ui.Invisible))
 	lw.l.SetGlobal("Col", luar.New(lw.l, ui.Col))
 	lw.l.SetGlobal("RGBA", luar.New(lw.l, func (r, g, b, a uint8) sdl.Color {
@@ -211,6 +213,16 @@ func (lw *LuaWidget) init() error {
 	return nil
 }
 
+func (lw *LuaWidget) reload() {
+	fmt.Println("LUA:", lw.Path(), "changed, reloading...")
+	err := lw.init()
+	if err != nil {
+		lw.frameFn = luar.New(lw.l, func() error {
+			return err
+		}).(*lua.LFunction)
+	}
+}
+
 func (lw *LuaWidget) Init() error {
 	err := lw.init()
 	if err != nil { return err }
@@ -225,12 +237,7 @@ func (lw *LuaWidget) Init() error {
 			case event, ok := <-watcher.Events:
 				if !ok { return }
 				if event.Has(fsnotify.Write) {
-					err = lw.init()
-					if err != nil {
-						lw.frameFn = luar.New(lw.l, func() error {
-							return err
-						}).(*lua.LFunction)
-					}
+					lw.reloadQueued = true
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok { return }
@@ -267,12 +274,20 @@ func (lw *LuaWidget) CallFn(fn *lua.LFunction, args ...lua.LValue) (ret lua.LVal
 }
 
 func (lw *LuaWidget) Frame() error {
+	if lw.reloadQueued {
+		lw.reloadQueued = false
+		lw.reload()
+	}
+
 	val, err := lw.CallFn(lw.frameFn)
 	if err != nil { return err }
+
 	lud, ok := val.(*lua.LUserData)
 	if !ok { return nil }
+
 	err, ok = lud.Value.(error)
 	if !ok { return nil }
+
 	return err
 }
 

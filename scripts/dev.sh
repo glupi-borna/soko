@@ -6,7 +6,7 @@ cd $BASEDIR/..
 function build() {
     killall wiggo
     if go build ./wiggo.go ; then
-        ./wiggo &
+        ./wiggo test &
     fi
 }
 

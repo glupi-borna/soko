@@ -93,14 +93,24 @@ func textRenderFn(n *Node) {
 	})
 }
 
-func sliderRenderFn(n *Node) {
+func hSliderRenderFn(n *Node) {
 	s := n.GetStyle()
 	hov := n.Focused()
 	perc := Animate(uiGet[float32](n, "perc", 0.5), n.UID + "-slider-anim")
+
 	scaled_size := V2{ X: n.RealSize.X * perc, Y: n.RealSize.Y }
 	if perc < 1 { drawNodeRectBg(n.Pos, n.RealSize, s, hov) }
-	if perc > 0 { drawNodeRect(n.Pos, scaled_size, s.CornerRadius, s.Foreground, StyleVariant[sdl.Color]{}, hov) }
-}
+	if perc > 0 { drawNodeRect(n.Pos, scaled_size, s.CornerRadius, s.Foreground, StyleVariant[sdl.Color]{}, hov) }}
+
+func vSliderRenderFn(n *Node) {
+	s := n.GetStyle()
+	hov := n.Focused()
+	perc := Animate(uiGet[float32](n, "perc", 0.5), n.UID + "-slider-anim")
+
+	scaled_size := V2{ X: n.RealSize.X, Y: n.RealSize.Y * perc }
+
+	if perc < 1 { drawNodeRectBg(n.Pos, n.RealSize, s, hov) }
+	if perc > 0 { drawNodeRect(n.Pos, scaled_size, s.CornerRadius, s.Foreground, StyleVariant[sdl.Color]{}, hov) }}
 
 type Number interface {
 	constraints.Integer|constraints.Float
@@ -239,13 +249,13 @@ func Button(fn func(*Node)) *Node {
 }
 
 func Slider(val, min, max float32) (float32, *Node) {
-	n := CurrentUI.Push("slider")
+	n := CurrentUI.Push("hslider")
 	defer CurrentUI.Pop(n)
 
 	diff := max - min
 
 	n.Flags.Focusable = true
-	n.RenderFn = sliderRenderFn
+	n.RenderFn = hSliderRenderFn
 	n.UpdateFn = sliderUpdateFn
 	n.Style = SliderStyle
 	n.Size.W = Px(200)
@@ -261,3 +271,28 @@ func Slider(val, min, max float32) (float32, *Node) {
 
 	return (perc*diff)+min, n
 }
+
+func VSlider(val, min, max float32) (float32, *Node) {
+	n := CurrentUI.Push("vslider")
+	defer CurrentUI.Pop(n)
+
+	diff := max - min
+
+	n.Flags.Focusable = true
+	n.RenderFn = vSliderRenderFn
+	n.UpdateFn = sliderUpdateFn
+	n.Style = SliderStyle
+	n.Size.W = Px(200)
+
+
+	var perc float32
+	if n.UID == CurrentUI.Hot {
+		perc = uiGet(n, "perc", perc)
+	} else {
+		perc = Clamp(val - min, 0, diff) / diff
+		n.Set("perc", perc)
+	}
+
+	return (perc*diff)+min, n
+}
+
