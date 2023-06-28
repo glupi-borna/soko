@@ -32,6 +32,8 @@ func Animate(val float32, id string) float32 {
 }
 
 func uiGet[K any](n *Node, key string, dflt K) (out K) {
+	Assert(CurrentUI != nil, "UI not initialized!")
+
 	data, ok := CurrentUI.Data[n.UID]
 
 	// If node data doesn't exist
@@ -155,6 +157,22 @@ func (ui *UI_State) Begin() {
 func (ui *UI_State) End() {
 	if ui.Current != ui.Root {
 		panic("Unbalanced UI stack!")
+	}
+
+	if ui.Root.Size.W.Type != DT_PX {
+		panic("UI Root width can only be specified in PX!")
+	}
+
+	if ui.Root.Size.H.Type != DT_PX {
+		panic("UI Root height can only be specified in PX!")
+	}
+
+	rw, rh := int32(ui.Root.Size.W.Amount), int32(ui.Root.Size.H.Amount)
+	wx, wy := Platform.Window.GetPosition()
+	ww, wh := Platform.Window.GetSize()
+	if rw != ww || rh != wh {
+		Platform.Window.SetSize(rw, rh)
+		Platform.Window.SetPosition(wx, wy)
 	}
 
 	ui.Root.ResolveStandalone()
