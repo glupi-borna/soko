@@ -9,12 +9,12 @@ import (
 	"os"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
-	. "github.com/glupi-borna/wiggo/internal/utils"
-	. "github.com/glupi-borna/wiggo/internal/platform"
-	. "github.com/glupi-borna/wiggo/internal/ui"
-	// . "github.com/glupi-borna/wiggo/internal/debug"
-	"github.com/glupi-borna/wiggo/internal/widget"
-	"github.com/glupi-borna/wiggo/internal/globals"
+	. "github.com/glupi-borna/soko/internal/utils"
+	. "github.com/glupi-borna/soko/internal/platform"
+	. "github.com/glupi-borna/soko/internal/ui"
+	// . "github.com/glupi-borna/soko/internal/debug"
+	"github.com/glupi-borna/soko/internal/widget"
+	"github.com/glupi-borna/soko/internal/globals"
 )
 
 var widget_name string
@@ -41,7 +41,7 @@ var window_anchor WindowAnchorFlag
 
 func UsageHandler() {
 	b := strings.Builder{}
-	b.WriteString("Usage: wiggo [options] widget_name\n")
+	b.WriteString("Usage: soko [options] widget_name\n")
 	b.WriteString("options:")
 
 	flag.VisitAll(func (f *flag.Flag) {

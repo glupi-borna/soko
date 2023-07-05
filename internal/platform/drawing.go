@@ -3,7 +3,7 @@ package platform
 import (
 	"math"
 	"github.com/veandco/go-sdl2/sdl"
-	. "github.com/glupi-borna/wiggo/internal/utils"
+	. "github.com/glupi-borna/soko/internal/utils"
 )
 
 func (p *platform) SetColor(c sdl.Color) {

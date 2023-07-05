@@ -10,9 +10,9 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/veandco/go-sdl2/sdl"
 
-	"github.com/glupi-borna/wiggo/internal/ui"
-	"github.com/glupi-borna/wiggo/internal/sound"
-	"github.com/glupi-borna/wiggo/internal/globals"
+	"github.com/glupi-borna/soko/internal/ui"
+	"github.com/glupi-borna/soko/internal/sound"
+	"github.com/glupi-borna/soko/internal/globals"
 )
 
 type LuaWidget struct {

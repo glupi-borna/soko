@@ -3,9 +3,9 @@ package ui
 import (
 	"strconv"
 	"github.com/veandco/go-sdl2/sdl"
-	. "github.com/glupi-borna/wiggo/internal/utils"
-	. "github.com/glupi-borna/wiggo/internal/platform"
-	. "github.com/glupi-borna/wiggo/internal/debug"
+	. "github.com/glupi-borna/soko/internal/utils"
+	. "github.com/glupi-borna/soko/internal/platform"
+	. "github.com/glupi-borna/soko/internal/debug"
 )
 
 type DIM_TYPE uint8

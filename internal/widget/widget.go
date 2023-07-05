@@ -28,7 +28,7 @@ func ExtSupported(ext string) bool {
 }
 
 // Finds widget definition files.
-// Widget definitions have filenames starting with 'wiggo_', and ending with one
+// Widget definitions have filenames starting with 'soko_', and ending with one
 // of the supported extensions (currently only lua).
 func FindWidgets() ([]Widget, error) {
 	out := []Widget{}
@@ -40,11 +40,11 @@ func FindWidgets() ([]Widget, error) {
 		if item.IsDir() { continue }
 
 		filename := item.Name()
-		if !strings.HasPrefix(filename, "wiggo_") { continue }
+		if !strings.HasPrefix(filename, "soko_") { continue }
 
 		ext := path.Ext(filename)
 		if !ExtSupported(ext) { continue }
-		name := filename[6:len(filename)-len(ext)]
+		name := filename[5:len(filename)-len(ext)]
 
 		switch ext {
 		case ".lua":
@@ -60,6 +60,7 @@ func Load(name string) (Widget, error) {
 	if err != nil { return nil, err }
 
 	for _, w := range all_widgets {
+		w.Name()
 		if w.Name() != name { continue }
 		return w, nil
 	}

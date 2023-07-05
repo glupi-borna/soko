@@ -7,7 +7,7 @@ import (
 	"strings"
 	"errors"
 	pa "mrogalski.eu/go/pulseaudio"
-	. "github.com/glupi-borna/wiggo/internal/utils"
+	. "github.com/glupi-borna/soko/internal/utils"
 )
 
 // @TODO: Consider forking https://github.com/mafik/pulseaudio/ to add more features here.

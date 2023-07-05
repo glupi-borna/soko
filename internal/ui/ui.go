@@ -1,8 +1,8 @@
 package ui
 
 import (
-	. "github.com/glupi-borna/wiggo/internal/platform"
-	. "github.com/glupi-borna/wiggo/internal/debug"
+	. "github.com/glupi-borna/soko/internal/platform"
+	. "github.com/glupi-borna/soko/internal/debug"
 )
 
 type NodeData map[string] any

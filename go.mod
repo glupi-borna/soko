@@ -1,4 +1,4 @@
-module github.com/glupi-borna/wiggo
+module github.com/glupi-borna/soko
 
 go 1.20
 

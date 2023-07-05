@@ -3,8 +3,8 @@ package ui
 import (
 	"golang.org/x/exp/constraints"
 	"github.com/veandco/go-sdl2/sdl"
-	. "github.com/glupi-borna/wiggo/internal/platform"
-	. "github.com/glupi-borna/wiggo/internal/utils"
+	. "github.com/glupi-borna/soko/internal/platform"
+	. "github.com/glupi-borna/soko/internal/utils"
 )
 
 func drawNodeRectBg(pos V2, size V2, s *Style, hovered bool) {

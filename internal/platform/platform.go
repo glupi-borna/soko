@@ -4,8 +4,8 @@ import (
 	"errors"
 	"os/exec"
 	"strconv"
-	. "github.com/glupi-borna/wiggo/internal/utils"
-	"github.com/glupi-borna/wiggo/internal/lru"
+	. "github.com/glupi-borna/soko/internal/utils"
+	"github.com/glupi-borna/soko/internal/lru"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 )
