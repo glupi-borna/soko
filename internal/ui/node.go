@@ -136,8 +136,8 @@ func defaultUpdateFn(n *Node) {
 		if CurrentUI.Mode == IM_MOUSE {
 			if n.HasMouse() {
 				CurrentUI.SetActive(n, false)
-				if MousePressed(sdl.BUTTON_LEFT) { CurrentUI.SetHot(n, false) }
-				if MouseReleased(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
+				if Platform.MousePressed(sdl.BUTTON_LEFT) { CurrentUI.SetHot(n, false) }
+				if Platform.MouseReleased(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
 			}
 		}
 
@@ -159,8 +159,8 @@ func rootUpdateFn(n *Node) {
 	if CurrentUI.Mode == IM_MOUSE {
 		if n.HasMouse() {
 			CurrentUI.SetActive(nil, false)
-			if MousePressed(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
-			if MouseReleased(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
+			if Platform.MousePressed(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
+			if Platform.MouseReleased(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
 		}
 	}
 }
@@ -181,8 +181,8 @@ func rootRenderFn(n *Node) {
 	rerender := last_radius != radius
 
 	c := n.Style.Background.Normal
-	SetColor(c)
-	DrawRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+	Platform.SetColor(c)
+	Platform.DrawRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
 
 	if shape == nil {
 		free = false
@@ -343,7 +343,7 @@ func (n *Node) ResolveStandalone() {
 
 	} else if n.Size.W.Type == DT_TEXT {
 		t := uiGet(n, "text", "")
-		n.RealSize.X = TextWidth(t) + n.Padding.Left + n.Padding.Right
+		n.RealSize.X = Platform.TextWidth(t) + n.Padding.Left + n.Padding.Right
 		n.IsWidthResolved = true
 	}
 
@@ -353,7 +353,7 @@ func (n *Node) ResolveStandalone() {
 
 	} else if n.Size.H.Type == DT_TEXT {
 		t := uiGet(n, "text", "")
-		n.RealSize.Y = TextHeight(t) + n.Padding.Top + n.Padding.Bottom
+		n.RealSize.Y = Platform.TextHeight(t) + n.Padding.Top + n.Padding.Bottom
 		n.IsHeightResolved = true
 	}
 
@@ -502,19 +502,19 @@ func (n *Node) ChildMax(fn func(*Node)float32) (val float32) {
 }
 
 func (n *Node) ParentWidth() float32 {
-	if n.Parent == nil { return WindowWidth() }
+	if n.Parent == nil { return Platform.WindowWidth() }
 	if n.Parent.IsWidthResolved { return n.Parent.RealSize.X }
 	return n.Parent.ParentWidth()
 }
 
 func (n *Node) ParentHeight() float32 {
-	if n.Parent == nil { return WindowHeight() }
+	if n.Parent == nil { return Platform.WindowHeight() }
 	if n.Parent.IsHeightResolved { return n.Parent.RealSize.X }
 	return n.Parent.ParentWidth()
 }
 
 func (n *Node) ParentRemainingWidth() float32 {
-	if n.Parent == nil { return WindowWidth() }
+	if n.Parent == nil { return Platform.WindowWidth() }
 	w := n.ParentWidth() - n.Parent.Padding.Left - n.Parent.Padding.Right
 	if n.Parent.Layout == LT_HORIZONTAL {
 		for _, child := range n.Parent.Children {
@@ -527,7 +527,7 @@ func (n *Node) ParentRemainingWidth() float32 {
 }
 
 func (n *Node) ParentRemainingHeight() float32 {
-	if n.Parent == nil { return WindowHeight() }
+	if n.Parent == nil { return Platform.WindowHeight() }
 	h := n.ParentHeight() - n.Parent.Padding.Top - n.Parent.Padding.Bottom
 	if n.Parent.Layout == LT_VERTICAL {
 		for _, child := range n.Parent.Children {
@@ -594,7 +594,7 @@ func (n *Node) Index() int {
 }
 
 func (n *Node) Clicked() bool {
-	return n.Flags.Focusable && n.UID == CurrentUI.Hot && MouseReleased(sdl.BUTTON_LEFT)
+	return n.Flags.Focusable && n.UID == CurrentUI.Hot && Platform.MouseReleased(sdl.BUTTON_LEFT)
 }
 
 func (n *Node) Focused() bool {
@@ -603,4 +603,14 @@ func (n *Node) Focused() bool {
 
 func (n *Node) MouseOffset() (float32, float32) {
 	return Platform.MousePos.X - n.Pos.X, Platform.MousePos.Y - n.Pos.Y
+}
+
+func (n *Node) GetFont() *Font {
+	if n.Style == nil || n.Style.Font == "" {
+		if n.Parent == nil {
+			return GetFont("Sans", 16)
+		}
+		return n.Parent.GetFont()
+	}
+	return GetFont(n.Style.Font, n.Style.FontSize)
 }

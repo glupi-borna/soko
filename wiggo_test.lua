@@ -50,6 +50,7 @@
 
 function frame()
     local root = UI().Root
+    root.Style.Font = "Ubuntu"
     Text("Hello!")
     root.Size.W.Amount = Animate(Slider(root.Size.W.Amount, 100, 300), "windowwidth")
     -- print(root.Size)

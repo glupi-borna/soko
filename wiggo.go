@@ -14,6 +14,7 @@ import (
 	. "github.com/glupi-borna/wiggo/internal/ui"
 	// . "github.com/glupi-borna/wiggo/internal/debug"
 	"github.com/glupi-borna/wiggo/internal/widget"
+	"github.com/glupi-borna/wiggo/internal/globals"
 )
 
 var widget_name string
@@ -26,12 +27,12 @@ var display = flag.Int(
 	"The number of the display that the widget should appear on.\n"+
 	"-1 -> the display that currently contains the mouse cursor.")
 
-var anchor_x = flag.Int(
+var window_x = flag.Int(
 	"x", 0,
 	"The x-position of the widget.\n"+
 	"Negative values are offset from the right side of the display.")
 
-var anchor_y = flag.Int(
+var window_y = flag.Int(
 	"y", 0,
 	"The y-position of the widget\n"+
 	"Negative values are offset from the right side of the display.")
@@ -101,12 +102,12 @@ func main() {
 
 	running := true
 	Platform.Init(PlatformInitOptions{
-		X: *anchor_x,
-		Y: *anchor_y,
+		X: int32(*window_x),
+		Y: int32(*window_y),
 		Anchor: window_anchor,
 		Display: *display,
 	})
-	Platform.Close = func() { running = false }
+	globals.Close = func () { running = false }
 
 	UI := MakeUI()
 
@@ -126,7 +127,7 @@ func main() {
 	for running {
 		FrameStart := sdl.GetTicks64()
 		if *timeout > 0 && FrameStart > *timeout { running = false }
-		if KeyboardPressed(sdl.SCANCODE_Q) { running = false }
+		if Platform.KeyboardPressed(sdl.SCANCODE_Q) { running = false }
 
 		ButtonMapUpdate(Platform.Keyboard)
 		ButtonMapUpdate(Platform.Mouse)
@@ -183,56 +184,10 @@ func main() {
 				UI.Root.Style = DefaultStyle.Copy()
 				UI.Root.Style.Background = StyleVar(ColHex(0xff0000ff))
 				WithNode(Column(), func(n *Node) {
-					Text("Error in " + w.Name())//.Styled().Foreground = StyleVar(Col(255))
-					Text("Check output for trace")//.Styled().Foreground = StyleVar(Col(255))
+					Text("Error in " + w.Name())
+					Text("Check output for trace")
 				})
 			}
-			/*Text(FloatStr(float64(FrameTime)/1000) + "ms")
-
-			WithNode(Row(), func(n *Node) {
-				n.Size.W = Fr(1)
-				Text("Hello, world!")
-
-				WithNode(Column(), func(n *Node) {
-					n.Padding = Padding2(8, -4)
-					if TextButton("Button") {
-						count++
-					}
-					Text("Clicked " + strconv.Itoa(count) + " times.")
-				})
-
-				WithNode(Column(), func(n *Node) {
-					n.Padding.Top = 0
-					n.Size.H = ChildrenSize()
-					Text("Stacked")
-					Text("text")
-				})
-
-				Seconds := FrameStart / 1000
-				t1 := float32(Seconds % 2 + 1)
-				t2 := float32(Seconds % 3 + 1)
-
-				t := Text(FloatStr(t1))
-				t.Size.W = Fr(Animate(t1, "1"))
-				t.Style = DefaultStyle.Copy()
-				t.Style.Border.Normal = sdl.Color{255, 255, 255, 255}
-
-				Invisible(Px(8))
-
-				t = Text(FloatStr(t2))
-				t.Size.W = Fr(Animate(t2, "2"))
-				t.Style = DefaultStyle.Copy()
-				t.Style.Border.Normal = sdl.Color{255, 255, 255, 255}
-
-				Text("Some more")
-			})
-
-			val, slider := Slider(val, -10, 10)
-			Text(FloatStr(val))
-			if TextButton("Set to 0") {
-				slider.Set("perc", float32(0.5))
-				slider.Set("perc-changed", true)
-			}*/
 		} ; UI.End()
 
 		UI.Render()

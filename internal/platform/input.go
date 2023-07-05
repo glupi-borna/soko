@@ -18,56 +18,39 @@ func ButtonMapUpdate[K comparable](m map[K]BUTTON_STATE) {
 	}
 }
 
-func KeyboardPressed(key uint32) bool {
-	state, ok := Platform.Keyboard[key]
+func (p *platform) KeyboardPressed(key uint32) bool {
+	state, ok := p.Keyboard[key]
 	if !ok { return false }
 	return state == BS_PRESSED
 }
 
-func KeyboardReleased(key uint32) bool {
-	state, ok := Platform.Keyboard[key]
+func (p *platform) KeyboardReleased(key uint32) bool {
+	state, ok := p.Keyboard[key]
 	if !ok { return false }
 	return state == BS_RELEASED
 }
 
-func MousePressed(btn uint8) bool {
-	state, ok := Platform.Mouse[btn]
+func (p *platform) MousePressed(btn uint8) bool {
+	state, ok := p.Mouse[btn]
 	if !ok { return false }
 	return state == BS_PRESSED
 }
 
-func MouseReleased(btn uint8) bool {
-	state, ok := Platform.Mouse[btn]
+func (p *platform) MouseReleased(btn uint8) bool {
+	state, ok := p.Mouse[btn]
 	if !ok { return false }
 	return state == BS_RELEASED
 }
 
-func MouseDown(btn uint8) bool {
-	state, ok := Platform.Mouse[btn]
+func (p *platform) MouseDown(btn uint8) bool {
+	state, ok := p.Mouse[btn]
 	if !ok { return false }
 	return state == BS_DOWN
 }
 
-func MouseUp(btn uint8) bool {
-	state, ok := Platform.Mouse[btn]
+func (p *platform) MouseUp(btn uint8) bool {
+	state, ok := p.Mouse[btn]
 	if !ok { return false }
 	return state == BS_UP
 }
 
-func WindowWidth() float32 {
-	w, _ := Platform.Window.GetSize()
-	return float32(w)
-}
-
-func WindowHeight() float32 {
-	_, h := Platform.Window.GetSize()
-	return float32(h)
-}
-
-func TextWidth(text string) float32 {
-	return TextMetrics(text).X
-}
-
-func TextHeight(text string) float32 {
-	return TextMetrics(text).Y
-}

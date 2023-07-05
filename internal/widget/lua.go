@@ -11,8 +11,8 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 
 	"github.com/glupi-borna/wiggo/internal/ui"
-	"github.com/glupi-borna/wiggo/internal/platform"
 	"github.com/glupi-borna/wiggo/internal/sound"
+	"github.com/glupi-borna/wiggo/internal/globals"
 )
 
 type LuaWidget struct {
@@ -64,11 +64,32 @@ func luaColor(val lua.LValue) (sdl.Color, bool) {
 	return sdl.Color{}, false
 }
 
+func luaInt(val lua.LValue) (int, bool) {
+	if val == lua.LNil { return 0, true }
+	num, ok := val.(lua.LNumber)
+	if ok { return int(num), true }
+	return 0, false
+}
+
 func luaFloat32(val lua.LValue) (float32, bool) {
 	if val == lua.LNil { return 0, true }
 	num, ok := val.(lua.LNumber)
 	if ok { return float32(num), true }
 	return 0, false
+}
+
+func luaFloat64(lv lua.LValue) (float64, bool) {
+	if lv == lua.LNil { return 0, false }
+	lvv, ok := lv.(lua.LNumber)
+	if !ok { return 0, false }
+	return float64(lvv), true
+}
+
+func luaString(lv lua.LValue) (string, bool) {
+	if lv == lua.LNil { return "", false }
+	lvv, ok := lv.(lua.LString)
+	if !ok { return "", false }
+	return lvv.String(), true
 }
 
 func luaStyleVar[K any](val lua.LValue, convert func(lua.LValue)(K, bool)) ui.StyleVariant[K] {
@@ -144,7 +165,7 @@ func (lw *LuaWidget) init() error {
 	lw.l.SetGlobal("Auto", luar.New(lw.l, ui.Auto))
 	lw.l.SetGlobal("ChildrenSize", luar.New(lw.l, ui.ChildrenSize))
 	lw.l.SetGlobal("FitText", luar.New(lw.l, ui.FitText))
-	lw.l.SetGlobal("Close", luar.New(lw.l, platform.Platform.Close))
+	lw.l.SetGlobal("Close", luar.New(lw.l, globals.Close))
 
 	lw.l.SetGlobal("Padding", luar.New(lw.l, func(args ...lua.LNumber) ui.Padding {
 		if len(args) == 1 { return ui.Padding1(float32(args[0])) }
@@ -175,6 +196,12 @@ func (lw *LuaWidget) init() error {
 
 		cr := arg.RawGetString("CornerRadius")
 		if cr != lua.LNil { s.CornerRadius = luaStyleVar(cr, luaFloat32) }
+
+		f, ok := luaString(arg.RawGetString("Font"))
+		if ok { s.Font = f }
+
+		fs, ok := luaInt(arg.RawGetString("FontSize"))
+		if ok { s.FontSize = fs }
 
 		pd := arg.RawGetString("Padding")
 		if pd != lua.LNil {

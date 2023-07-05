@@ -6,16 +6,39 @@ import (
 	. "github.com/glupi-borna/wiggo/internal/utils"
 )
 
-func SetColor(c sdl.Color) {
-	Platform.Renderer.SetDrawColor(c.R, c.G, c.B, c.A)
+func (p *platform) SetColor(c sdl.Color) {
+	p.Renderer.SetDrawColor(c.R, c.G, c.B, c.A)
 }
 
-func DrawRectOutlined(x, y, w, h float32) {
-	Platform.Renderer.DrawRectF(&sdl.FRect{x, y, w, h})
+func (p *platform) RawSetFont(font *Font) {
+	p.Font = font
 }
 
-func DrawRectFilled(x, y, w, h float32) {
-	Platform.Renderer.FillRectF(&sdl.FRect{x, y, w, h})
+func (p *platform) SetFont(font_name string, font_size int) {
+	font := GetFont(font_name, font_size)
+	p.Font = font
+}
+
+func (p *platform) DrawRectOutlined(x, y, w, h float32) {
+	p.Renderer.DrawRectF(&sdl.FRect{x, y, w, h})
+}
+
+func (p *platform) DrawRectFilled(x, y, w, h float32) {
+	p.Renderer.FillRectF(&sdl.FRect{x, y, w, h})
+}
+
+func (p *platform) DrawText(text string, x, y float64) {
+	r, g, b, a, _ := p.Renderer.GetDrawColor()
+	c := sdl.Color{r, g, b, a}
+
+	tex := p.getTextTexture(p.Font, text, c)
+	m := p.TextMetrics(text)
+
+	p.Renderer.CopyF(tex, nil, &sdl.FRect{
+		float32(math.Round(x)),
+		float32(math.Round(y)),
+		m.X, m.Y,
+	})
 }
 
 var ARCPOINTS = make([]sdl.FPoint, 0)
@@ -87,21 +110,21 @@ func cornerPointsCount(r float32) int {
 	return int(Max(arc_length / MIN_SEGMENT_LENGTH, 2))
 }
 
-func DrawPoints(pts []sdl.FPoint) {
-	Platform.Renderer.DrawPointsF(pts)
+func (p *platform) DrawPoints(pts []sdl.FPoint) {
+	p.Renderer.DrawPointsF(pts)
 }
 
-func DrawRoundRectOutlined(x, y, w, h, r float32) {
+func (p *platform) DrawRoundRectOutlined(x, y, w, h, r float32) {
 	points := RoundRectPoints(x, y, Max(w-1, 0), Max(h-1, 0), r)
-	Platform.Renderer.DrawLinesF(points)
+	p.Renderer.DrawLinesF(points)
 	l := len(points)-1
-	Platform.Renderer.DrawLineF(points[0].X, points[0].Y, points[l].X, points[l].Y)
+	p.Renderer.DrawLineF(points[0].X, points[0].Y, points[l].X, points[l].Y)
 }
 
 var RRVERTS = make([]sdl.Vertex, 0)
 
-func DrawRoundRectFilled(x, y, w, h, r float32) {
-	R,G,B,A,_ := Platform.Renderer.GetDrawColor()
+func (p *platform) DrawRoundRectFilled(x, y, w, h, r float32) {
+	R,G,B,A,_ := p.Renderer.GetDrawColor()
 	c := sdl.Color{R,G,B,A}
 
 	points := RoundRectPoints(x, y, w, h, r)
@@ -126,5 +149,5 @@ func DrawRoundRectFilled(x, y, w, h, r float32) {
 		RRVERTS[idx+2].Position.Y = points[next_i].Y
 	}
 
-	Platform.Renderer.RenderGeometry(nil, RRVERTS, nil)
+	p.Renderer.RenderGeometry(nil, RRVERTS, nil)
 }

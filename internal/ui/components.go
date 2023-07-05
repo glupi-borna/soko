@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"math"
 	"golang.org/x/exp/constraints"
 	"github.com/veandco/go-sdl2/sdl"
 	. "github.com/glupi-borna/wiggo/internal/platform"
@@ -42,23 +41,23 @@ func drawNodeRect(
 
 	if corner == 0 {
 		if bg {
-			SetColor(bgc)
-			DrawRectFilled(pos.X, pos.Y, size.X, size.Y)
+			Platform.SetColor(bgc)
+			Platform.DrawRectFilled(pos.X, pos.Y, size.X, size.Y)
 		}
 
 		if border {
-			SetColor(borderc)
-			DrawRectOutlined(pos.X, pos.Y, size.X, size.Y)
+			Platform.SetColor(borderc)
+			Platform.DrawRectOutlined(pos.X, pos.Y, size.X, size.Y)
 		}
 	} else {
 		if bg {
-			SetColor(bgc)
-			DrawRoundRectFilled(pos.X, pos.Y, size.X, size.Y, corner)
+			Platform.SetColor(bgc)
+			Platform.DrawRoundRectFilled(pos.X, pos.Y, size.X, size.Y, corner)
 		}
 
 		if border {
-			SetColor(borderc)
-			DrawRoundRectOutlined(pos.X, pos.Y, size.X, size.Y, corner)
+			Platform.SetColor(borderc)
+			Platform.DrawRoundRectOutlined(pos.X, pos.Y, size.X, size.Y, corner)
 		}
 	}
 }
@@ -71,6 +70,7 @@ func defaultRenderFn(n *Node) {
 func textRenderFn(n *Node) {
 	t := uiGet(n, "text", "")
 	s := n.GetStyle()
+	f := n.GetFont()
 
 	var c sdl.Color
 	var hov = false
@@ -82,15 +82,9 @@ func textRenderFn(n *Node) {
 	}
 
 	drawNodeRectBg(n.Pos, n.RealSize, s, hov)
-
-	tex := GetTextTexture(Platform.Font, t, c)
-	m := TextMetrics(t)
-
-	Platform.Renderer.CopyF(tex, nil, &sdl.FRect{
-		float32(math.Round(float64(n.Pos.X + n.Padding.Left))),
-		float32(math.Round(float64(n.Pos.Y + n.Padding.Top))),
-		m.X, m.Y,
-	})
+	Platform.SetColor(c)
+	Platform.RawSetFont(f)
+	Platform.DrawText(t, float64(n.Pos.X + n.Padding.Left), float64(n.Pos.Y + n.Padding.Top))
 }
 
 func hSliderRenderFn(n *Node) {
@@ -125,8 +119,8 @@ func sliderUpdateFn(n *Node) {
 
 		if n.HasMouse() {
 			CurrentUI.SetActive(n, false)
-			if MousePressed(sdl.BUTTON_LEFT) { CurrentUI.SetHot(n, false) }
-			if MouseReleased(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
+			if Platform.MousePressed(sdl.BUTTON_LEFT) { CurrentUI.SetHot(n, false) }
+			if Platform.MouseReleased(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
 		}
 	}
 
@@ -142,8 +136,8 @@ func sliderUpdateFn(n *Node) {
 }
 
 func invisibleRenderFn(n *Node) {
-	SetColor(sdl.Color{255, 0, 0, 255})
-	DrawRectOutlined(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+	Platform.SetColor(sdl.Color{255, 0, 0, 255})
+	Platform.DrawRectOutlined(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
 }
 
 func WithNode(n *Node, fn func(*Node)) *Node {

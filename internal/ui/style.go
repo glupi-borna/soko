@@ -52,6 +52,8 @@ type Style struct {
 	Border   	 StyleVariant[sdl.Color]
 	CornerRadius StyleVariant[float32]
 	Padding      Padding
+	Font         string
+	FontSize     int
 }
 
 func (s *Style) Copy() *Style {
@@ -75,6 +77,8 @@ var DefaultStyle = Style{
 	Foreground: StyleVar(Col(255)),
 	Background: StyleVar(ColHex(0x0)),
 	Border: StyleVar(ColHex(0x0)),
+	Font: "Sans",
+	FontSize: 16,
 }
 
 var ButtonStyle = Style{

@@ -148,8 +148,8 @@ func (ui *UI_State) Begin() {
 	ui.Root = GetNode("root", nil)
 	ui.Root.UpdateFn = rootUpdateFn
 	ui.Root.RenderFn = rootRenderFn
-	ui.Root.Size.W = Px(WindowWidth())
-	ui.Root.Size.H = Px(WindowHeight())
+	ui.Root.Size.W = Px(Platform.WindowWidth())
+	ui.Root.Size.H = Px(Platform.WindowHeight())
 	ui.Root.Style = &DefaultStyle
 	ui.Current = ui.Root
 }
@@ -168,12 +168,7 @@ func (ui *UI_State) End() {
 	}
 
 	rw, rh := int32(ui.Root.Size.W.Amount), int32(ui.Root.Size.H.Amount)
-	wx, wy := Platform.Window.GetPosition()
-	ww, wh := Platform.Window.GetSize()
-	if rw != ww || rh != wh {
-		Platform.Window.SetSize(rw, rh)
-		Platform.Window.SetPosition(wx, wy)
-	}
+	Platform.ResizeWindow(rw, rh)
 
 	ui.Root.ResolveStandalone()
 	ui.Root.ResolveUpwards()
