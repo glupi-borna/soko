@@ -6,7 +6,7 @@ cd $BASEDIR/..
 function build() {
     killall soko
     if go build ./soko.go ; then
-        ./soko test &
+        ./soko -x -250 -y 25 test &
     fi
 }
 

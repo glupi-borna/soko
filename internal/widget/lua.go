@@ -12,6 +12,7 @@ import (
 
 	"github.com/glupi-borna/soko/internal/ui"
 	"github.com/glupi-borna/soko/internal/sound"
+	"github.com/glupi-borna/soko/internal/player"
 	"github.com/glupi-borna/soko/internal/globals"
 )
 
@@ -222,6 +223,11 @@ func (lw *LuaWidget) init() error {
 		lw.l.SetGlobal(key, lv)
 	}
 
+	for key, val := range player.WidgetFns {
+		lv := luar.New(lw.l, val)
+		lw.l.SetGlobal(key, lv)
+	}
+
 	lw.l.Push(fn)
 	err = lw.l.PCall(0, lua.MultRet, nil)
 	if err != nil { return err }
@@ -236,6 +242,8 @@ func (lw *LuaWidget) init() error {
 	lw.initFn = initfn
 	lw.frameFn = framefn
 	lw.cleanUpFn = cleanfn
+
+	lw.CallFn(lw.initFn)
 
 	return nil
 }

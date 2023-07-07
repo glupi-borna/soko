@@ -26,7 +26,19 @@ function CloseRow()
     end
 end
 
+function init()
+    local players, err = Players()
+    print(players, err)
+end
+
 function frame()
+    local root = UI().Root
+    root.Style.Font = "Ubuntu"
+    root.Style.FontSize = 16
+
+    local players = Players()
+    Text("Players: " .. tostring(#players))
+
     for n in With(Row()) do
         n.Size.H = Fr(1)
 
