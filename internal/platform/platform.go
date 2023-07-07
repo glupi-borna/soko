@@ -10,23 +10,51 @@ import (
 	"github.com/veandco/go-sdl2/ttf"
 )
 
-type WindowAnchorFlag string
+type WindowAnchorFlag struct {
+	V2
+}
 
-func (w WindowAnchorFlag) String() string { return string(w) }
-func (w WindowAnchorFlag) Set(val string) error {
+func (w *WindowAnchorFlag) Help() string {
+	return `Available values:
+	top-left       top[-center]        top-right
+	[middle-]left middle[-center] [middle]-right
+	bottom-left   bottom[-center]   bottom-right`
+}
 
+func (w *WindowAnchorFlag) String() string {
+	return w.V2.String()
+}
 
-	if val == "top-left" {
-		w = WindowAnchorFlag(val)
-		return nil
+func (w *WindowAnchorFlag) Set(val string) error {
+	switch val {
+	case "top-left": w.X = 0 ; w.Y = 0
+
+	case "top-center": fallthrough
+	case "top": w.X = -0.5 ; w.Y = 0
+
+	case "top-right": w.X = -1 ; w.Y = 0
+
+	case "middle-left": fallthrough
+	case "left": w.X = 0 ; w.Y = -0.5
+
+	case "middle-center": fallthrough
+	case "middle": w.X = -0.5 ; w.Y = -0.5
+
+	case "middle-right": fallthrough
+	case "right": w.X = -1 ; w.Y = -0.5
+
+	case "bottom-left": w.X = 0 ; w.Y = -1
+
+	case "bottom-center": fallthrough
+	case "bottom": w.X = -0.5 ; w.Y = -1
+
+	case "bottom-right": w.X = -1 ; w.Y = -1
+
+	default:
+		return errors.New("Aborting")
 	}
 
-	if val == "center" {
-		w = WindowAnchorFlag(val)
-		return nil
-	}
-
-	return errors.New("Unsupported window-anchor value: '" + val + "'")
+	return nil
 }
 
 var Platform platform
@@ -100,14 +128,18 @@ type platform struct {
 	Font *Font
 	FontSize float64
 	Color sdl.Color
+
+	shapeSurf *sdl.Surface
+	cornerRadius float32
 }
 
 func (p *platform) Init(opts PlatformInitOptions) {
 	p.TargetDisplay = opts.Display
 	p.TargetPosition = V2i{X: opts.X, Y: opts.Y}
+	p.AnchorOffset = opts.Anchor.V2
 
 	var window_flags uint32 =
-		sdl.WINDOW_SHOWN |
+		sdl.WINDOW_HIDDEN |
 		sdl.WINDOW_BORDERLESS |
 		sdl.WINDOW_UTILITY |
 		// NOTE: if this flag is not provided, shaped
@@ -137,17 +169,9 @@ func (p *platform) Init(opts PlatformInitOptions) {
 	p.Renderer = renderer
 
 	p.ResizeWindow(200, 200)
+	p.ReshapeWindow(0, true)
 
 	p.SetFont("Sans", 16)
-	// font, err := GetFont()
-	// Die(err)
-
-	// fh := font.Height()
-	// p.Font = Font{
-	// 	SDLFont: font,
-	// 	Height: float32(fh),
-	// 	CacheName: font.FaceFamilyName() + "|" + font.FaceStyleName() + strconv.Itoa(fh) + "|",
-	// }
 
 	p.Mouse = make(map[uint8]BUTTON_STATE)
 	p.Keyboard = make(map[uint32]BUTTON_STATE)
@@ -218,30 +242,97 @@ func (p *platform) TargetDisplayBounds() (sdl.Rect, error) {
 	return sdl.Rect{}, errors.New("Invalid -display constant: " + strconv.Itoa(p.TargetDisplay))
 }
 
+func (p *platform) ReshapeWindow(radius float32, force bool) {
+	window_resized := false
+	radius_changed := radius != p.cornerRadius
+	p.cornerRadius = radius
+
+	w, h := p.Window.GetSize()
+	if p.shapeSurf != nil {
+		window_resized = p.shapeSurf.W != w || p.shapeSurf.H != h
+	}
+
+	if !window_resized && !radius_changed && !force { return }
+
+	if (window_resized && p.shapeSurf != nil) || p.shapeSurf == nil {
+		var err error
+		p.shapeSurf, err = sdl.CreateRGBSurfaceWithFormat(
+			0, w, h,
+			32, sdl.PIXELFORMAT_RGBA8888)
+		Die(err)
+	}
+
+	shape := p.shapeSurf
+
+	shape.FillRect(nil, 0)
+	ir := int32(radius)
+
+	if radius > 0 {
+		pxls := shape.Pixels()
+		rsq := ir*ir
+		bpp := int32(shape.BytesPerPixel())
+
+		for x := -ir; x < ir ; x++ {
+			xsq := x*x
+			for y := -ir; y < ir ; y++ {
+				if xsq + y*y < rsq {
+					i := shape.Pitch * (y+ir) + bpp * (x+ir)
+					pxls[i] = 255
+					i = shape.Pitch * (y+ir) + bpp * (x+w-ir-1)
+					pxls[i] = 255
+					i = shape.Pitch * (y+h-ir-1) + bpp * (x+ir)
+					pxls[i] = 255
+					i = shape.Pitch * (y+h-ir-1) + bpp * (x+w-ir-1)
+					pxls[i] = 255
+				}
+			}
+		}
+	}
+
+	r := sdl.Rect{ir, 0, w-ir*2, h}
+	shape.FillRect(&r, 255)
+	r = sdl.Rect{0, ir, w, h-ir*2}
+	shape.FillRect(&r, 255)
+
+	x, y := Platform.Window.GetPosition()
+	Platform.Window.SetShape(shape, sdl.ShapeModeDefault{})
+	Platform.Window.SetPosition(x, y)
+}
+
 func (p *platform) ResizeWindow(width int32, height int32) {
 	ow, oh := p.Window.GetSize()
 	ox, oy := p.Window.GetPosition()
-	if ow == width && oh == height && ox > 0 && oy > 0 { return }
+
+	if ox != -1000 && oy != -1000 {
+		if ow == width && oh == height { return }
+	}
 
 	bounds, err := p.TargetDisplayBounds()
 	Die(err)
 	dx := bounds.X
 	dy := bounds.Y
 
+	ax := p.AnchorOffset.X
+	ay := p.AnchorOffset.Y
+
 	if p.TargetPosition.X < 0 {
-		dx += (bounds.W - width) + p.TargetPosition.X
+		dx += bounds.W + p.TargetPosition.X + 1
+		ax *= -1
+	} else {
+		dx += p.TargetPosition.X
 	}
 
 	if p.TargetPosition.Y < 0 {
-		dy += (bounds.H - height) + p.TargetPosition.Y
+		dy += bounds.H + p.TargetPosition.Y + 1
+		ay *= -1
+	} else {
+		dy += p.TargetPosition.Y
 	}
 
 	x := int32(dx) + int32(float32(width) * p.AnchorOffset.X)
 	y := int32(dy) + int32(float32(height) * p.AnchorOffset.Y)
 	p.Window.SetSize(width, height)
 	p.Window.SetPosition(x, y)
-	println(p.Window.GetPosition())
-	println(p.Window.GetSize())
 }
 
 func (p *platform) WindowWidth() float32 {

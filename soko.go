@@ -12,14 +12,16 @@ import (
 	. "github.com/glupi-borna/soko/internal/utils"
 	. "github.com/glupi-borna/soko/internal/platform"
 	. "github.com/glupi-borna/soko/internal/ui"
-	// . "github.com/glupi-borna/soko/internal/debug"
+	. "github.com/glupi-borna/soko/internal/debug"
 	"github.com/glupi-borna/soko/internal/widget"
 	"github.com/glupi-borna/soko/internal/globals"
 )
 
 var widget_name string
 
-var profile = flag.Bool("profile", false, "run profiling webserver")
+var no_profile = false
+var profile *bool = &no_profile
+
 var timeout = flag.Uint64("timeout", 0, "stop running after this number of milliseconds (0 = no timeout)")
 
 var display = flag.Int(
@@ -42,7 +44,7 @@ var window_anchor WindowAnchorFlag
 func UsageHandler() {
 	b := strings.Builder{}
 	b.WriteString("Usage: soko [options] widget_name\n")
-	b.WriteString("options:")
+	b.WriteString("options:\n")
 
 	flag.VisitAll(func (f *flag.Flag) {
 		b.WriteString("\n-")
@@ -55,6 +57,7 @@ func UsageHandler() {
 			b.WriteString("\n\t")
 			b.WriteString(line)
 		}
+		b.WriteString("\n")
 	})
 
 	println(b.String())
@@ -63,14 +66,16 @@ func UsageHandler() {
 func main() {
 	flag.Usage = UsageHandler
 
-	flag.Var(window_anchor, "anchor",
-	"Alignment of the widget against it's position\n" +
-	"Supported values:\n" +
-	"	top-left\n" +
-	"	center")
+	if DEBUG {
+		profile = flag.Bool("profile", false, "run profiling webserver")
+	}
+
+	flag.Var(&window_anchor, "anchor",
+		"Alignment of the widget against it's position\n" +
+		window_anchor.Help())
 
 	flag.Parse()
-	if *profile {
+	if DEBUG && *profile {
 		go func() {
 			err := http.ListenAndServe("localhost:6060", nil)
 			if err != nil {
@@ -121,6 +126,8 @@ func main() {
 	defer func() {
 		Die(w.Cleanup())
 	}()
+
+	Platform.Window.Show()
 
 	last_err_text := ""
 
@@ -192,8 +199,6 @@ func main() {
 
 		UI.Render()
 		Platform.Renderer.Present()
-		// FrameTime = FrameStart - LastFrameStart
-		// LastFrameStart = FrameStart
 	}
 }
 

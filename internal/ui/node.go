@@ -166,90 +166,13 @@ func rootUpdateFn(n *Node) {
 }
 
 func rootRenderFn(n *Node) {
-	var err error
 	s := n.GetStyle()
 	radius := s.CornerRadius.Normal
-
-	shape := uiGet[*sdl.Surface](n, "shape_surface", nil)
-	w, h := int32(n.RealSize.X), int32(n.RealSize.Y)
-
-	free := false
-	recreate := false
-
-	last_radius := uiGet(n, "last_radius", radius)
-
-	rerender := last_radius != radius
-
 	c := n.Style.Background.Normal
+
 	Platform.SetColor(c)
 	Platform.DrawRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
-
-	if shape == nil {
-		free = false
-		recreate = true
-		rerender = true
-	} else if w != shape.W || h != shape.H {
-		free = true
-		recreate = true
-		rerender = true
-	}
-
-	if !free && !recreate { return }
-
-	if free { shape.Free() }
-
-	if recreate {
-		shape, err = sdl.CreateRGBSurfaceWithFormat(
-			0, int32(n.RealSize.X), int32(n.RealSize.Y),
-			32, sdl.PIXELFORMAT_RGBA8888)
-		Die(err)
-	}
-
-	if rerender {
-		shape.FillRect(nil, 0)
-
-		ir := int32(radius)
-
-		if radius > 0 {
-			pxls := shape.Pixels()
-			rsq := ir*ir
-			bpp := int32(shape.BytesPerPixel())
-
-			for x := -ir; x < ir ; x++ {
-				xsq := x*x
-				for y := -ir; y < ir ; y++ {
-					if xsq + y*y < rsq {
-						i := shape.Pitch * (y+ir) + bpp * (x+ir)
-						pxls[i] = 255
-						i = shape.Pitch * (y+ir) + bpp * (x+w-ir-1)
-						pxls[i] = 255
-						i = shape.Pitch * (y+h-ir-1) + bpp * (x+ir)
-						pxls[i] = 255
-						i = shape.Pitch * (y+h-ir-1) + bpp * (x+w-ir-1)
-						pxls[i] = 255
-					}
-				}
-			}
-		}
-
-		r := sdl.Rect{ir, 0, w-ir*2, h}
-		shape.FillRect(&r, 255)
-		r = sdl.Rect{0, ir, w, h-ir*2}
-		shape.FillRect(&r, 255)
-
-		sdl.ClearError()
-		res := Platform.Window.SetShape(shape, sdl.ShapeModeDefault{})
-
-		if DEBUG {
-			switch res {
-			case sdl.NONSHAPEABLE_WINDOW: Log("Nonshapeable window")
-			case sdl.INVALID_SHAPE_ARGUMENT: Log("Invalid shape arg", shape)
-			case sdl.WINDOW_LACKS_SHAPE: Log("Window lacks shape")
-			}
-			err = sdl.GetError()
-			if err != nil { Log(err.Error())}
-		}
-	}
+	Platform.ReshapeWindow(radius, false)
 }
 
 func (n *Node) Styled() *Style {
