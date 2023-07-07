@@ -6,12 +6,9 @@ import (
 	"fmt"
 	"strings"
 	"errors"
-	pa "mrogalski.eu/go/pulseaudio"
+	pa "github.com/glupi-borna/pulseaudio"
 	. "github.com/glupi-borna/soko/internal/utils"
 )
-
-// @TODO: Consider forking https://github.com/mafik/pulseaudio/ to add more features here.
-// @NOTE: https://github.com/mafik/pulseaudio/ has a memory leak in the `bread` function
 
 var pulseClient *pa.Client = nil
 
