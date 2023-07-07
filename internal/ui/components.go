@@ -104,16 +104,49 @@ func vSliderRenderFn(n *Node) {
 	scaled_size := V2{ X: n.RealSize.X, Y: n.RealSize.Y * perc }
 
 	if perc < 1 { drawNodeRectBg(n.Pos, n.RealSize, s, hov) }
-	if perc > 0 { drawNodeRect(n.Pos, scaled_size, s.CornerRadius, s.Foreground, StyleVariant[sdl.Color]{}, hov) }}
+	if perc > 0 { drawNodeRect(
+		V2{
+			X: n.Pos.X + (n.RealSize.X - scaled_size.X),
+			Y: n.Pos.Y + (n.RealSize.Y - scaled_size.Y),
+		}, scaled_size,
+		s.CornerRadius, s.Foreground,
+		StyleVariant[sdl.Color]{}, hov)
+	}
+}
 
 type Number interface {
 	constraints.Integer|constraints.Float
 }
 
-func sliderUpdateFn(n *Node) {
+func hSliderUpdateFn(n *Node) {
 	if CurrentUI.Mode == IM_MOUSE {
 		if n.UID == n.UI.Hot {
 			new_perc := Clamp((Platform.MousePos.X - n.Pos.X) / n.RealSize.X, 0, 1)
+			n.Set("perc", new_perc)
+		}
+
+		if n.HasMouse() {
+			CurrentUI.SetActive(n, false)
+			if Platform.MousePressed(sdl.BUTTON_LEFT) { CurrentUI.SetHot(n, false) }
+			if Platform.MouseReleased(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
+		}
+	}
+
+	if CurrentUI.Mode == IM_KBD && CurrentUI.Active == n.UID {
+		// xkbd := Btof(KeyboardPressed(sdl.SCANCODE_RIGHT)) - Btof(KeyboardPressed(sdl.SCANCODE_LEFT))
+		// ykbd := Btof(KeyboardPressed(sdl.SCANCODE_DOWN)) - Btof(KeyboardPressed(sdl.SCANCODE_UP))
+		/*
+			if xkbd != 0 && ykbd != 0 {
+				_UI.MoveActive(n, xkbd, ykbd)
+			}
+		*/
+	}
+}
+
+func vSliderUpdateFn(n *Node) {
+	if CurrentUI.Mode == IM_MOUSE {
+		if n.UID == n.UI.Hot {
+			new_perc := 1 - Clamp((Platform.MousePos.Y - n.Pos.Y) / n.RealSize.Y, 0, 1)
 			n.Set("perc", new_perc)
 		}
 
@@ -157,41 +190,6 @@ func Column() *Node {
 	n.Layout = LT_VERTICAL
 	return n
 }
-
-// func Margin(dim Dimension, inner *Node) *Node {
-// 	margin := GetNode("margin-h", nil)
-// 	margin.RenderFn = invisibleRenderFn
-// 	margin.Layout = LT_HORIZONTAL
-// 	margin.Parent = inner.Parent
-// 	idx := inner.Index()
-//
-// 	cur := UI.Current
-// 	defer func(){ UI.Current = cur }()
-// 	UI.Current = margin
-//
-// 	Invisible(dim)
-// 	WithNode(UI.Push("margin-v"), func(r *Node) {
-// 		r.Layout = LT_VERTICAL
-// 		r.RenderFn = invisibleRenderFn
-//
-// 		Invisible(dim)
-// 		r.Children = append(r.Children, inner)
-// 		inner.Parent = r
-// 		Invisible(dim)
-// 	})
-// 	Invisible(dim)
-//
-// 	margin.Parent.Children[idx] = margin
-// 	margin.UID = buildNodeUID(margin)
-//
-// 	old_uid := inner.UID
-// 	inner.UID = buildNodeUID(inner)
-//
-// 	UI_Data[inner.UID] = UI_Data[old_uid]
-// 	delete(UI_Data, old_uid)
-//
-// 	return margin
-// }
 
 func Invisible(dim Dimension) *Node {
 	n := CurrentUI.Push("invisible")
@@ -250,7 +248,7 @@ func Slider(val, min, max float32) (float32, *Node) {
 
 	n.Flags.Focusable = true
 	n.RenderFn = hSliderRenderFn
-	n.UpdateFn = sliderUpdateFn
+	n.UpdateFn = hSliderUpdateFn
 	n.Style = SliderStyle
 	n.Size.W = Px(200)
 
@@ -274,10 +272,9 @@ func VSlider(val, min, max float32) (float32, *Node) {
 
 	n.Flags.Focusable = true
 	n.RenderFn = vSliderRenderFn
-	n.UpdateFn = sliderUpdateFn
+	n.UpdateFn = vSliderUpdateFn
 	n.Style = SliderStyle
 	n.Size.W = Px(200)
-
 
 	var perc float32
 	if n.UID == CurrentUI.Hot {
