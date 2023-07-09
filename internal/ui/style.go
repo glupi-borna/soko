@@ -34,16 +34,31 @@ func StyleVars[K any](norm, hov K) StyleVariant[K] {
 	return StyleVariant[K]{ Normal: norm, Active: hov }
 }
 
-type Padding struct {
+type PaddingType struct {
 	Left, Right, Top, Bottom float32
 }
 
-func Padding1(pad float32) Padding {
-	return Padding{pad, pad, pad, pad}
+func Padding1(pad float32) PaddingType {
+	return PaddingType{pad, pad, pad, pad}
 }
 
-func Padding2(x float32, y float32) Padding {
-	return Padding{x, x, y, y}
+func Padding2(x float32, y float32) PaddingType {
+	return PaddingType{x, x, y, y}
+}
+
+func Padding(args ...float32) PaddingType {
+	if len(args) == 1 { return Padding1(args[0]) }
+	if len(args) == 2 { return Padding2(args[0], args[1]) }
+	if len(args) == 4 {
+		return PaddingType{
+			Left: args[0],
+			Top: args[1],
+			Right: args[2],
+			Bottom: args[3],
+		}
+	}
+	println("Padding(): unsupported number of arguments:", len(args))
+	return PaddingType{}
 }
 
 type Style struct {
@@ -51,7 +66,7 @@ type Style struct {
 	Background   StyleVariant[sdl.Color]
 	Border   	 StyleVariant[sdl.Color]
 	CornerRadius StyleVariant[float32]
-	Padding      Padding
+	Padding      PaddingType
 	Font         string
 	FontSize     int
 }

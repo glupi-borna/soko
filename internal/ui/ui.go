@@ -31,6 +31,14 @@ func Animate(val float32, id string) float32 {
 	return new
 }
 
+// Returns true approximately every time `seconds` passes
+func Tick(seconds float64) bool {
+	Assert(CurrentUI != nil, "UI not initialized!")
+
+	ms := uint64(seconds * 1000)
+	return CurrentUI.LastFrameStart / ms != CurrentUI.FrameStart / ms || CurrentUI.LastFrameStart == 0
+}
+
 func uiGet[K any](n *Node, key string, dflt K) (out K) {
 	Assert(CurrentUI != nil, "UI not initialized!")
 
@@ -98,6 +106,10 @@ type UI_State struct {
 
 	ActiveChanged bool
 	HotChanged    bool
+
+	LastFrameStart uint64
+	FrameStart uint64
+	DeltaMs uint64
 }
 
 func (ui *UI_State) Reset() {
@@ -142,8 +154,11 @@ func (ui *UI_State) SetHot(node *Node, force bool) {
 	ui.HotChanged = true
 }
 
-func (ui *UI_State) Begin() {
+func (ui *UI_State) Begin(millis uint64) {
 	CurrentUI = ui
+	ui.LastFrameStart = ui.FrameStart
+	ui.FrameStart = millis
+	ui.DeltaMs = ui.FrameStart - ui.LastFrameStart
 	ui.Reset()
 	ui.Root = GetNode("root", nil)
 	ui.Root.UpdateFn = rootUpdateFn

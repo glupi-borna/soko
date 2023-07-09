@@ -9,11 +9,7 @@ import (
 	"layeh.com/gopher-luar"
 	"github.com/fsnotify/fsnotify"
 	"github.com/veandco/go-sdl2/sdl"
-
 	"github.com/glupi-borna/soko/internal/ui"
-	"github.com/glupi-borna/soko/internal/sound"
-	"github.com/glupi-borna/soko/internal/player"
-	"github.com/glupi-borna/soko/internal/globals"
 )
 
 type LuaWidget struct {
@@ -126,27 +122,17 @@ func (lw *LuaWidget) Name() string { return lw.name }
 func (lw *LuaWidget) Path() string { return lw.path }
 func (lw *LuaWidget) Type() string { return "lua" }
 
+func (lw *LuaWidget) Expose(name string, val any) {
+	lw.l.SetGlobal(name, luar.New(lw.l, val))
+}
+
 func (lw *LuaWidget) init() error {
 	if lw.l == nil { lw.l = lua.NewState() }
 
 	fn, err := lw.l.LoadFile(lw.path)
 	if err != nil { return err }
 
-	lw.l.SetGlobal("UI", luar.New(lw.l, func() *ui.UI_State { return ui.CurrentUI }))
-	lw.l.SetGlobal("TextButton", luar.New(lw.l, ui.TextButton))
-	lw.l.SetGlobal("Text", luar.New(lw.l, ui.Text))
-	lw.l.SetGlobal("Animate", luar.New(lw.l, ui.Animate))
-	lw.l.SetGlobal("Column", luar.New(lw.l, ui.Column))
-	lw.l.SetGlobal("Row", luar.New(lw.l, ui.Row))
-	lw.l.SetGlobal("Button", luar.New(lw.l, ui.Button))
-	lw.l.SetGlobal("Slider", luar.New(lw.l, ui.Slider))
-	lw.l.SetGlobal("VSlider", luar.New(lw.l, ui.VSlider))
-	lw.l.SetGlobal("Invisible", luar.New(lw.l, ui.Invisible))
-	lw.l.SetGlobal("Col", luar.New(lw.l, ui.Col))
-	lw.l.SetGlobal("RGBA", luar.New(lw.l, func (r, g, b, a uint8) sdl.Color {
-		return sdl.Color{r, g, b, a}
-	}))
-	lw.l.SetGlobal("ColHex", luar.New(lw.l, ui.ColHex))
+	ExposeEnvironment(lw)
 
 	NodeIter := func (iterable *ui.Node, item *ui.Node) *ui.Node {
 		if item == nil { return iterable }
@@ -159,29 +145,6 @@ func (lw *LuaWidget) init() error {
 
 	lw.l.SetGlobal("With", luar.New(lw.l, func(n *ui.Node) (any, any, any) {
 		return NodeIter, n, nil
-	}))
-
-	lw.l.SetGlobal("Fr", luar.New(lw.l, ui.Fr))
-	lw.l.SetGlobal("Px", luar.New(lw.l, ui.Px))
-	lw.l.SetGlobal("Em", luar.New(lw.l, ui.Em))
-	lw.l.SetGlobal("Auto", luar.New(lw.l, ui.Auto))
-	lw.l.SetGlobal("ChildrenSize", luar.New(lw.l, ui.ChildrenSize))
-	lw.l.SetGlobal("FitText", luar.New(lw.l, ui.FitText))
-	lw.l.SetGlobal("Close", luar.New(lw.l, globals.Close))
-
-	lw.l.SetGlobal("Padding", luar.New(lw.l, func(args ...lua.LNumber) ui.Padding {
-		if len(args) == 1 { return ui.Padding1(float32(args[0])) }
-		if len(args) == 2 { return ui.Padding2(float32(args[0]), float32(args[1])) }
-		if len(args) == 4 {
-			return ui.Padding{
-				Left: float32(args[0]),
-				Top: float32(args[1]),
-				Right: float32(args[2]),
-				Bottom: float32(args[3]),
-			}
-		}
-		println("Padding(): unsupported number of arguments:", len(args))
-		return ui.Padding{}
 	}))
 
 	lw.l.SetGlobal("Style", luar.New(lw.l, func(arg *lua.LTable) *ui.Style {
@@ -209,7 +172,7 @@ func (lw *LuaWidget) init() error {
 		if pd != lua.LNil {
 			pdud, ok := pd.(*lua.LUserData)
 			if ok {
-				p, ok := pdud.Value.(ui.Padding)
+				p, ok := pdud.Value.(ui.PaddingType)
 				if ok {
 					s.Padding = p
 				}
@@ -218,16 +181,6 @@ func (lw *LuaWidget) init() error {
 
 		return s
 	}))
-
-	for key, val := range sound.WidgetFns {
-		lv := luar.New(lw.l, val)
-		lw.l.SetGlobal(key, lv)
-	}
-
-	for key, val := range player.WidgetFns {
-		lv := luar.New(lw.l, val)
-		lw.l.SetGlobal(key, lv)
-	}
 
 	lw.l.Push(fn)
 	err = lw.l.PCall(0, lua.MultRet, nil)

@@ -3,7 +3,7 @@ local players = nil
 local frameIdx = 0
 
 function refreshPlayers()
-    if frameIdx % 120 == 0 then
+    if players == nil or Tick(5) then
         local err = nil
         players, err = Players()
         if err ~= nil then print(err:Error()) end
@@ -11,6 +11,7 @@ function refreshPlayers()
 end
 
 function GetPlayer()
+    if players == nil then return nil end
     local len = #players
     for i=1, len do
         local p = players[i]
@@ -40,39 +41,6 @@ function PlayerStatus()
     return s
 end
 
-function Marquee(text, len, duration)
-    local textlen = #text
-    if textlen <= len then
-        Text(text)
-        return
-    end
-
-    local loopIdx = frameIdx % 1200
-
-    local quarter = math.floor(duration*0.25)
-    local half = math.floor(duration*0.5)
-
-    local progress = 0
-    if loopIdx < quarter then
-        progress = 0
-    elseif loopIdx >= 3*quarter then
-        progress = 1
-    else
-        progress = ((loopIdx - quarter) % half) / half
-    end
-
-    local max = textlen - len
-    local firstIdx = math.floor(max * progress)
-
-    if firstIdx == 0 then
-        Text(text:sub(firstIdx, firstIdx+len-3) .. "...")
-    elseif firstIdx == max then
-        Text("..." .. text:sub(firstIdx+3, firstIdx+len))
-    else
-        Text("..." .. text:sub(firstIdx+3, firstIdx+len-3) .. "...")
-    end
-end
-
 function frame()
     refreshPlayers()
 
@@ -87,7 +55,7 @@ function frame()
             if TextButton(PlayerStatus()) then
                 PlayerPlayPause()
             end
-            Marquee(PlayerTitle(), 30, 600)
+            Marquee(PlayerTitle(), 15)
             UI().Last.Padding = Padding(8, 4)
         end
     end

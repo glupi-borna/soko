@@ -179,7 +179,9 @@ func main() {
 
 		Platform.Renderer.SetDrawColor(255, 0, 0, 255)
 
-		UI.Begin(); {
+		millis := sdl.GetTicks64()
+
+		UI.Begin(millis); {
 			err := w.Frame()
 			if err != nil {
 				if err.Error() != last_err_text {
@@ -197,7 +199,7 @@ func main() {
 			}
 		} ; UI.End()
 
-		PrintTree(UI.Root, "")
+		// PrintTree(UI.Root, "")
 		UI.Render()
 		Platform.Renderer.Present()
 	}

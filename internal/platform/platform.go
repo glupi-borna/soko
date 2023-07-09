@@ -189,7 +189,7 @@ func fontCacheKey(f *Font, text string, c sdl.Color) string {
 	return f.CacheName + ColStr(c) + "|" + text
 }
 
-func (p *platform) getTextTexture(f *Font, t string, c sdl.Color) *sdl.Texture {
+func (p *platform) GetTextTexture(f *Font, t string, c sdl.Color) *sdl.Texture {
 	key := fontCacheKey(f, t, c)
 	tex, ok := fontTextureCache.Get(key)
 	if ok { return tex }

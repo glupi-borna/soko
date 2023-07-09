@@ -63,7 +63,7 @@ type Node struct {
 	Parent    *Node // Parent of this node - null if the node is the root node, or is detached.
 	Children  []*Node
 	Style     *Style
-	Padding   Padding
+	Padding   PaddingType
 
 	// Semantic size
 	Size Size

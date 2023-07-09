@@ -27,16 +27,16 @@ func (p *platform) DrawRectFilled(x, y, w, h float32) {
 	p.Renderer.FillRectF(&sdl.FRect{x, y, w, h})
 }
 
-func (p *platform) DrawText(text string, x, y float64) {
+func (p *platform) DrawText(text string, x, y float32) {
 	r, g, b, a, _ := p.Renderer.GetDrawColor()
 	c := sdl.Color{r, g, b, a}
 
-	tex := p.getTextTexture(p.Font, text, c)
+	tex := p.GetTextTexture(p.Font, text, c)
 	m := p.TextMetrics(text)
 
 	p.Renderer.CopyF(tex, nil, &sdl.FRect{
-		float32(math.Round(x)),
-		float32(math.Round(y)),
+		float32(math.Round(float64(x))),
+		float32(math.Round(float64(y))),
 		m.X, m.Y,
 	})
 }

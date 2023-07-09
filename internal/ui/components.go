@@ -84,7 +84,7 @@ func textRenderFn(n *Node) {
 	drawNodeRectBg(n.Pos, n.RealSize, s, hov)
 	Platform.SetColor(c)
 	Platform.RawSetFont(f)
-	Platform.DrawText(t, float64(n.Pos.X + n.Padding.Left), float64(n.Pos.Y + n.Padding.Top))
+	Platform.DrawText(t, n.Pos.X + n.Padding.Left, n.Pos.Y + n.Padding.Top)
 }
 
 func hSliderRenderFn(n *Node) {
@@ -196,7 +196,7 @@ func Invisible(dim Dimension) *Node {
 	defer CurrentUI.Pop(n)
 	n.Size.W = dim
 	n.Size.H = dim
-	n.Padding = Padding{}
+	n.Padding = PaddingType{}
 	n.RenderFn = invisibleRenderFn
 	return n
 }
@@ -208,10 +208,79 @@ func Text(text string) *Node {
 	n.Set("text", text)
 	n.Size.W = FitText()
 	n.Size.H = FitText()
-	n.Padding = Padding{}
+	n.Padding = PaddingType{}
 
 	n.RenderFn = textRenderFn
 	return n
+}
+
+func Marquee(text string, speed float32) *Node {
+	n := CurrentUI.Push("marquee")
+	defer CurrentUI.Pop(n)
+
+	n.Set("text", text)
+	n.Set("speed", speed)
+	n.Size.W = Em(8)
+	n.Size.H = Em(1)
+	n.Padding = PaddingType{}
+
+	n.RenderFn = marqueeRenderFn
+	return n
+}
+
+func marqueeRenderFn(n *Node) {
+	t := uiGet(n, "text", "")
+	speed := uiGet[float32](n, "speed", 100)
+	s := n.GetStyle()
+	f := n.GetFont()
+
+	var c sdl.Color
+	var hov = false
+	if CurrentUI.Active == n.UID || n.IsChildOfUID(CurrentUI.Active) {
+		hov = true
+		c = s.Foreground.Active
+	} else {
+		c = s.Foreground.Normal
+	}
+
+	drawNodeRectBg(n.Pos, n.RealSize, s, hov)
+
+	x := n.Pos.X + n.Padding.Left
+	y := n.Pos.Y + n.Padding.Top
+
+	m := Platform.TextMetrics(t)
+
+	if m.X <= n.RealSize.X {
+		Platform.SetColor(c)
+		Platform.DrawText(t, x, y)
+	} else {
+		w := int32(n.RealSize.X)
+		tex := Platform.GetTextTexture(f, t, c)
+		maxoff := m.X - n.RealSize.X
+		total_time_pps := maxoff / speed
+		total_time_ms := uint64(total_time_pps * 1000)
+
+		perc := float64(CurrentUI.FrameStart % total_time_ms) / float64(total_time_ms)
+
+		target := sdl.FRect{x, y, float32(w), m.Y}
+		if perc < 0.25 {
+			Platform.Renderer.CopyF(
+				tex,
+				&sdl.Rect{0, 0, w, int32(m.Y)},
+				&target)
+		} else if perc > 0.75 {
+			Platform.Renderer.CopyF(
+				tex,
+				&sdl.Rect{int32(maxoff), 0, w, int32(m.Y)},
+				&target)
+		} else {
+			pperc := (perc - 0.25) * 2
+			Platform.Renderer.CopyF(
+				tex,
+				&sdl.Rect{int32(pperc * float64(maxoff)), 0, w, int32(m.Y)},
+				&target)
+		}
+	}
 }
 
 func TextButton(text string) bool {
