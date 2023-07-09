@@ -1,80 +1,106 @@
 local volume = Volume()
+local players = nil
+local frameIdx = 0
 
-function SliderWidget()
-    volume = Volume()
-    local old_val = volume
-
-    if TextButton("-") then volume = volume - 0.05 end
-
-    Invisible(Px(8))
-
-    volume = Slider(volume, 0, 1)
-    local slider = UI().Last
-    slider.Size.W = Fr(1)
-    slider.Size.H = Px(30)
-
-    Invisible(Px(8))
-
-    if TextButton("+") then volume = volume - 0.05 end
-
-    if volume ~= old_vol then SetVolume(volume) end
-end
-
-function CloseRow()
-    if TextButton("Close") then
-        Close()
+function refreshPlayers()
+    if frameIdx % 120 == 0 then
+        local err = nil
+        players, err = Players()
+        if err ~= nil then print(err:Error()) end
     end
 end
 
-function init()
-    local players, err = Players()
-    print(players, err)
+function GetPlayer()
+    local len = #players
+    for i=1, len do
+        local p = players[i]
+        local _, err = p:GetPlaybackStatus()
+        if err == nil then return p end
+    end
+    return nil
+end
+
+function PlayerTitle()
+    local p = GetPlayer()
+    if p == nil then return "" end
+    local t, _ = p:GetTitle()
+    return t
+end
+
+function PlayerPlayPause()
+    local p = GetPlayer()
+    if p == nil then return end
+    p:PlayPause()
+end
+
+function PlayerStatus()
+    local p = GetPlayer()
+    if p == nil then return "" end
+    local s, _ = p:GetPlaybackStatus()
+    return s
+end
+
+function Marquee(text, len, duration)
+    local textlen = #text
+    if textlen <= len then
+        Text(text)
+        return
+    end
+
+    local loopIdx = frameIdx % 1200
+
+    local quarter = math.floor(duration*0.25)
+    local half = math.floor(duration*0.5)
+
+    local progress = 0
+    if loopIdx < quarter then
+        progress = 0
+    elseif loopIdx >= 3*quarter then
+        progress = 1
+    else
+        progress = ((loopIdx - quarter) % half) / half
+    end
+
+    local max = textlen - len
+    local firstIdx = math.floor(max * progress)
+
+    if progress == 0 then
+        Text(text:sub(firstIdx, firstIdx+len-3) .. "...")
+    elseif progress == 1 then
+        Text("..." .. text:sub(firstIdx, firstIdx+len-3))
+    else
+        Text("..." .. text:sub(firstIdx, firstIdx+len-6) .. "...")
+    end
 end
 
 function frame()
+    refreshPlayers()
+
     local root = UI().Root
+    root.Size.W = Px(500)
     root.Style.Font = "Ubuntu"
-    root.Style.FontSize = 16
+    root.Style.FontSize = 20
 
-    local players = Players()
-    Text("Players: " .. tostring(#players))
-
-    for n in With(Row()) do
-        n.Size.H = Fr(1)
-
-        for n in With(Column()) do
-            n.Size.W = Fr(1)
-            Text("Volume")
-
-            for n in With(Row()) do
-                SliderWidget()
+    local title = PlayerTitle()
+    if title ~= "" then
+        for _ in With(Row()) do
+            if TextButton(PlayerStatus()) then
+                PlayerPlayPause()
             end
+            Marquee(PlayerTitle(), 30, 600)
+            UI().Last.Padding = Padding(8, 4)
         end
-
-        local old_vol = volume
-        volume = VSlider(volume, 0, 1)
-        local slider = UI().Last
-        slider.Size.W = Px(16)
-        slider.Size.H = Fr(1)
-        if volume ~= old_vol then SetVolume(volume) end
     end
-end
 
--- function frame()
---     local root = UI().Root
---     root.Style.CornerRadius.Normal = 5
---
---     root.Style.Font = "Ubuntu"
---     root.Style.FontSize = 32
---
---     Text("Hello! Test.")
---
---     root.Size.W.Amount = Animate(
---         Slider(
---             root.Size.W.Amount, 100, 300
---         ),
---         "windowwidth"
---     )
---
---     UI().Last.Size.W = Fr(1)
--- end
+    Text("Volume")
+    UI().Last.Padding = Padding(8, 4)
+
+    local old_vol = volume
+    volume = Slider(volume, 0, 1)
+    local slider = UI().Last
+    slider.Size.W = Fr(1)
+    slider.Size.H = Px(16)
+    if volume ~= old_vol then SetVolume(volume) end
+
+    frameIdx = frameIdx + 1
+end

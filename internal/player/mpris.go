@@ -1,7 +1,7 @@
 package player
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"github.com/godbus/dbus/v5"
 	"github.com/glupi-borna/soko/internal/globals"
@@ -35,7 +35,8 @@ const playerOpenURI = mprisPlayer + ".OpenURI"
 const playerPlaybackStatus = mprisPlayer + ".PlaybackStatus"
 const playerLoopStatus = mprisPlayer + ".LoopStatus"
 
-var nilVariantErr = fmt.Errorf("Variant value is nil")
+var nilVariantErr = errors.New("Variant value is nil")
+var missingKeyErr = errors.New("Missing key")
 
 type PlaybackStatus string
 const (
@@ -61,7 +62,11 @@ func usToS(microseconds int64) float64 {
 
 func Players(conn *dbus.Conn) ([]string, error) {
 	var mprisNames []string
-	names := conn.Names()
+	var names []string
+
+	err := conn.BusObject().Call(dbusListNames, 0).Store(&names)
+	if err != nil { return nil, err }
+
 	for _, name := range names {
 		if strings.HasPrefix(name, mpris) {
 			mprisNames = append(mprisNames, name)
@@ -105,18 +110,9 @@ func playerGet[K any](i *Player, prop string) (out K, err error) {
 	return out, nil
 }
 
-func (i *Player) GetName() string {
-	return i.name
-}
-
-func (i *Player) Raise() error {
-	return i.obj.Call(mprisRaise, 0).Err
-}
-
-func (i *Player) Quit() error {
-	return i.obj.Call(mprisQuit, 0).Err
-}
-
+func (i *Player) GetName() string { return i.name }
+func (i *Player) Raise() error { return i.obj.Call(mprisRaise, 0).Err }
+func (i *Player) Quit() error { return i.obj.Call(mprisQuit, 0).Err }
 func (i *Player) Next() error { return i.Call("Next", 0) }
 func (i *Player) Previous() error { return i.Call("Previous", 0) }
 func (i *Player) Pause() error { return i.Call("Pause", 0) }
@@ -134,7 +130,9 @@ func (i *Player) GetIdentity() (string, error) {
 }
 
 func (i *Player) GetPlaybackStatus() (PlaybackStatus, error) {
-	return playerGet[PlaybackStatus](i, "PlaybackStatus")
+	s, err := playerGet[string](i, "PlaybackStatus")
+	if err != nil { return PlaybackStatus(""), err }
+	return PlaybackStatus(s), nil
 }
 
 func (i *Player) GetLoopStatus() (LoopStatus, error) {
@@ -169,15 +167,38 @@ func (i *Player) SetVolume(volume float64) error {
 	return i.Set("Volume", volume)
 }
 
+func (i *Player) GetInfo(name string) (any, error) {
+	meta, err := i.GetMetadata()
+	if err != nil { return nil, err }
+	if meta == nil { return nil, nilVariantErr }
+	val, ok := meta[name]
+	if !ok { return nil, missingKeyErr }
+	return val.Value(), nil
+}
+
+func playerInfo[K any](i *Player, name string) (out K, err error) {
+	val, err := i.GetInfo(name)
+	if err != nil { return out, err }
+	out = val.(K)
+	return out, nil
+}
+
 // Returns the current track length in seconds.
 func (i *Player) GetLength() (float64, error) {
-	metadata, err := i.GetMetadata()
+	out, err := playerInfo[int64](i, "mpris:length")
 	if err != nil { return 0.0, err }
-	if metadata == nil || metadata["mpris:length"].Value() == nil {
-		return 0.0, nilVariantErr
-	}
-	return usToS(metadata["mpris:length"].Value().(int64)), nil
+	return usToS(out), nil
 }
+
+func (i *Player) GetTrackId() (dbus.ObjectPath, error) { return playerInfo[dbus.ObjectPath](i, "mpris:trackid") }
+func (i *Player) GetArtUrl() (string, error) { return playerInfo[string](i, "mpris:artUrl") }
+func (i *Player) GetAlbum() (string, error) { return playerInfo[string](i, "xesam:album") }
+func (i *Player) GetAlbumArtist() (string, error) { return playerInfo[string](i, "xesam:albumArtist") }
+func (i *Player) GetArtist() (string, error) { return playerInfo[string](i, "xesam:artist") }
+func (i *Player) GetLyrics() (string, error) { return playerInfo[string](i, "xesam:asText") }
+func (i *Player) GetBPM() (int, error) { return playerInfo[int](i, "xesam:audioBPM") }
+func (i *Player) GetTitle() (string, error) { return playerInfo[string](i, "xesam:title") }
+func (i *Player) GetUrl() (string, error) { return playerInfo[string](i, "xesam:url") }
 
 // Returns the current track position in seconds.
 func (i *Player) GetPosition() (float64, error) {
@@ -188,10 +209,8 @@ func (i *Player) GetPosition() (float64, error) {
 
 // Sets the position of the current track in seconds.
 func (i *Player) SetPosition(position float64) error {
-	metadata, err := i.GetMetadata()
+	trackId, err := i.GetTrackId()
 	if err != nil { return err }
-	if metadata == nil || metadata["mpris:trackid"].Value() == nil { return nilVariantErr }
-	trackId := metadata["mpris:trackid"].Value().(dbus.ObjectPath)
 	i.SetTrackPosition(&trackId, position)
 	return nil
 }
@@ -208,7 +227,7 @@ var WidgetFns = map[string]any{
 			return []*Player{}, nil
 		}
 
-		out := make([]*Player, len(player_names))
+		out := make([]*Player, 0, len(player_names))
 		for _, name := range player_names {
 			player := MakePlayer(conn, name)
 			out = append(out, player)
