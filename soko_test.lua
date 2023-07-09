@@ -64,12 +64,12 @@ function Marquee(text, len, duration)
     local max = textlen - len
     local firstIdx = math.floor(max * progress)
 
-    if progress == 0 then
+    if firstIdx == 0 then
         Text(text:sub(firstIdx, firstIdx+len-3) .. "...")
-    elseif progress == 1 then
-        Text("..." .. text:sub(firstIdx, firstIdx+len-3))
+    elseif firstIdx == max then
+        Text("..." .. text:sub(firstIdx+3, firstIdx+len))
     else
-        Text("..." .. text:sub(firstIdx, firstIdx+len-6) .. "...")
+        Text("..." .. text:sub(firstIdx+3, firstIdx+len-3) .. "...")
     end
 end
 
@@ -77,13 +77,13 @@ function frame()
     refreshPlayers()
 
     local root = UI().Root
-    root.Size.W = Px(500)
     root.Style.Font = "Ubuntu"
-    root.Style.FontSize = 20
+    root.Style.FontSize = 16
 
     local title = PlayerTitle()
     if title ~= "" then
-        for _ in With(Row()) do
+        for n in With(Row()) do
+            n.Size.W = ChildrenSize()
             if TextButton(PlayerStatus()) then
                 PlayerPlayPause()
             end
@@ -98,8 +98,8 @@ function frame()
     local old_vol = volume
     volume = Slider(volume, 0, 1)
     local slider = UI().Last
-    slider.Size.W = Fr(1)
-    slider.Size.H = Px(16)
+    slider.Size.W = Em(8)
+    slider.Size.H = Em(1)
     if volume ~= old_vol then SetVolume(volume) end
 
     frameIdx = frameIdx + 1

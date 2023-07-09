@@ -197,6 +197,7 @@ func main() {
 			}
 		} ; UI.End()
 
+		PrintTree(UI.Root, "")
 		UI.Render()
 		Platform.Renderer.Present()
 	}
@@ -204,7 +205,7 @@ func main() {
 
 func PrintTree(n *Node, indent string) {
 	child_indent := indent + "  "
-	println(indent + n.Type, n.RealSize.String())
+	println(indent + n.Type, n.Pos.String(), n.RealSize.String())
 	for _, child := range n.Children {
 		PrintTree(child, child_indent)
 	}

@@ -148,8 +148,8 @@ func (ui *UI_State) Begin() {
 	ui.Root = GetNode("root", nil)
 	ui.Root.UpdateFn = rootUpdateFn
 	ui.Root.RenderFn = rootRenderFn
-	ui.Root.Size.W = Px(Platform.WindowWidth())
-	ui.Root.Size.H = Px(Platform.WindowHeight())
+	ui.Root.Size.W = ChildrenSize()//Px(Platform.WindowWidth())
+	ui.Root.Size.H = ChildrenSize()//Px(Platform.WindowHeight())
 	ui.Root.Style = &DefaultStyle
 	ui.Current = ui.Root
 }
@@ -159,22 +159,14 @@ func (ui *UI_State) End() {
 		panic("Unbalanced UI stack!")
 	}
 
-	if ui.Root.Size.W.Type != DT_PX {
-		panic("UI Root width can only be specified in PX!")
-	}
-
-	if ui.Root.Size.H.Type != DT_PX {
-		panic("UI Root height can only be specified in PX!")
-	}
-
-	rw, rh := int32(ui.Root.Size.W.Amount), int32(ui.Root.Size.H.Amount)
-	Platform.ResizeWindow(rw, rh)
-
 	ui.Root.ResolveStandalone()
 	ui.Root.ResolveUpwards()
 	ui.Root.ResolveDownwards()
 	ui.Root.ResolveViolations()
 	ui.Root.ResolvePos()
+
+	rw, rh := int32(ui.Root.RealSize.X), int32(ui.Root.RealSize.Y)
+	Platform.ResizeWindow(rw, rh)
 
 	if Platform.MouseDelta.ManhattanLength() > 5 { ui.Mode = IM_MOUSE }
 	if Platform.AnyKeyPressed { ui.Mode = IM_KBD }

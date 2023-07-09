@@ -11,7 +11,7 @@ import (
 type DIM_TYPE uint8
 const (
 	DT_AUTO DIM_TYPE = iota
-	DT_PX ; DT_FR ; DT_TEXT ; DT_CHILDREN ; DT_SKIP
+	DT_PX ; DT_EM ; DT_FR ; DT_TEXT ; DT_CHILDREN ; DT_SKIP
 )
 
 type Dimension struct {
@@ -24,6 +24,7 @@ func (d *Dimension) String() string {
 		case DT_CHILDREN: return "children"
 		case DT_TEXT: return "text"
 		case DT_FR: return FloatStr(d.Amount) + "fr"
+		case DT_EM: return FloatStr(d.Amount) + "em"
 		case DT_PX: return FloatStr(d.Amount) + "px"
 		default: panic("Unknown Dimension Type: " + strconv.Itoa(int(d.Type)))
 	}
@@ -31,6 +32,7 @@ func (d *Dimension) String() string {
 
 func Px(amount float32) Dimension { return Dimension{Type: DT_PX, Amount: amount} }
 func Fr(amount float32) Dimension { return Dimension{Type: DT_FR, Amount: amount} }
+func Em(amount float32) Dimension { return Dimension{Type: DT_EM, Amount: amount} }
 func ChildrenSize() Dimension { return Dimension{ Type: DT_CHILDREN }}
 func FitText() Dimension { return Dimension{ Type: DT_TEXT }}
 func Auto() Dimension { return Dimension{ Type: DT_AUTO } }
@@ -264,6 +266,10 @@ func (n *Node) ResolveStandalone() {
 		n.RealSize.X = n.Size.W.Amount
 		n.IsWidthResolved = true
 
+	} else if n.Size.W.Type == DT_EM {
+		n.RealSize.X = n.Size.W.Amount * n.GetFont().Height
+		n.IsWidthResolved = true
+
 	} else if n.Size.W.Type == DT_TEXT {
 		t := uiGet(n, "text", "")
 		n.RealSize.X = Platform.TextWidth(t) + n.Padding.Left + n.Padding.Right
@@ -272,6 +278,10 @@ func (n *Node) ResolveStandalone() {
 
 	if n.Size.H.Type == DT_PX {
 		n.RealSize.Y = n.Size.H.Amount
+		n.IsHeightResolved = true
+
+	} else if n.Size.H.Type == DT_EM {
+		n.RealSize.Y = n.Size.H.Amount * n.GetFont().Height
 		n.IsHeightResolved = true
 
 	} else if n.Size.H.Type == DT_TEXT {
@@ -365,7 +375,7 @@ func (n *Node) ResolveViolations() {
 	total_width := w + n.Padding.Left + n.Padding.Right
 	total_height := h + n.Padding.Top + n.Padding.Bottom
 
-	if total_width > n.RealSize.X {
+	if n.Layout == LT_HORIZONTAL && total_width > n.RealSize.X {
 		fracs := n.xFracs()
 		if fracs > 0 {
 			fracdec := (total_width - n.RealSize.X) / fracs
@@ -377,7 +387,7 @@ func (n *Node) ResolveViolations() {
 		}
 	}
 
-	if total_height > n.RealSize.Y {
+	if n.Layout == LT_VERTICAL && total_height > n.RealSize.Y {
 		fracs := n.yFracs()
 		if fracs > 0 {
 			fracdec := (total_height - n.RealSize.Y) / fracs
@@ -425,19 +435,31 @@ func (n *Node) ChildMax(fn func(*Node)float32) (val float32) {
 }
 
 func (n *Node) ParentWidth() float32 {
-	if n.Parent == nil { return Platform.WindowWidth() }
+	if n.Parent == nil {
+		tdb, err := Platform.TargetDisplayBounds()
+		Die(err)
+		return float32(tdb.W)
+	}
 	if n.Parent.IsWidthResolved { return n.Parent.RealSize.X }
 	return n.Parent.ParentWidth()
 }
 
 func (n *Node) ParentHeight() float32 {
-	if n.Parent == nil { return Platform.WindowHeight() }
+	if n.Parent == nil {
+		tdb, err := Platform.TargetDisplayBounds()
+		Die(err)
+		return float32(tdb.H)
+	}
 	if n.Parent.IsHeightResolved { return n.Parent.RealSize.X }
 	return n.Parent.ParentWidth()
 }
 
 func (n *Node) ParentRemainingWidth() float32 {
-	if n.Parent == nil { return Platform.WindowWidth() }
+	if n.Parent == nil {
+		tdb, err := Platform.TargetDisplayBounds()
+		Die(err)
+		return float32(tdb.W)
+	}
 	w := n.ParentWidth() - n.Parent.Padding.Left - n.Parent.Padding.Right
 	if n.Parent.Layout == LT_HORIZONTAL {
 		for _, child := range n.Parent.Children {
@@ -450,7 +472,11 @@ func (n *Node) ParentRemainingWidth() float32 {
 }
 
 func (n *Node) ParentRemainingHeight() float32 {
-	if n.Parent == nil { return Platform.WindowHeight() }
+	if n.Parent == nil {
+		tdb, err := Platform.TargetDisplayBounds()
+		Die(err)
+		return float32(tdb.H)
+	}
 	h := n.ParentHeight() - n.Parent.Padding.Top - n.Parent.Padding.Bottom
 	if n.Parent.Layout == LT_VERTICAL {
 		for _, child := range n.Parent.Children {

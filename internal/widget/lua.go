@@ -163,6 +163,7 @@ func (lw *LuaWidget) init() error {
 
 	lw.l.SetGlobal("Fr", luar.New(lw.l, ui.Fr))
 	lw.l.SetGlobal("Px", luar.New(lw.l, ui.Px))
+	lw.l.SetGlobal("Em", luar.New(lw.l, ui.Em))
 	lw.l.SetGlobal("Auto", luar.New(lw.l, ui.Auto))
 	lw.l.SetGlobal("ChildrenSize", luar.New(lw.l, ui.ChildrenSize))
 	lw.l.SetGlobal("FitText", luar.New(lw.l, ui.FitText))
