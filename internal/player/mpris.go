@@ -215,7 +215,7 @@ func (i *Player) SetPosition(position float64) error {
 	return nil
 }
 
-var WidgetFns = map[string]any{
+var WidgetVars = map[string]any{
 	"Players": func() ([]*Player, error) {
 		conn, err := globals.DbusConn()
 		if err != nil { return nil, err }

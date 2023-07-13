@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"time"
 	. "github.com/glupi-borna/soko/internal/platform"
 	. "github.com/glupi-borna/soko/internal/debug"
 )
@@ -34,9 +35,10 @@ func Animate(val float32, id string) float32 {
 // Returns true approximately every time `seconds` passes
 func Tick(seconds float64) bool {
 	Assert(CurrentUI != nil, "UI not initialized!")
-
-	ms := uint64(seconds * 1000)
-	return CurrentUI.LastFrameStart / ms != CurrentUI.FrameStart / ms || CurrentUI.LastFrameStart == 0
+	ns := uint64(seconds * 1000 * 1000 * 1000)
+	last_frame_tick := uint64(CurrentUI.LastFrameStart) / ns
+	current_frame_tick := uint64(CurrentUI.FrameStart) / ns
+	return last_frame_tick != current_frame_tick || CurrentUI.LastFrameStart == 0
 }
 
 func uiGet[K any](n *Node, key string, dflt K) (out K) {
@@ -107,9 +109,9 @@ type UI_State struct {
 	ActiveChanged bool
 	HotChanged    bool
 
-	LastFrameStart uint64
-	FrameStart uint64
-	DeltaMs uint64
+	LastFrameStart time.Duration
+	FrameStart time.Duration
+	Delta time.Duration
 }
 
 func (ui *UI_State) Reset() {
@@ -157,8 +159,8 @@ func (ui *UI_State) SetHot(node *Node, force bool) {
 func (ui *UI_State) Begin(millis uint64) {
 	CurrentUI = ui
 	ui.LastFrameStart = ui.FrameStart
-	ui.FrameStart = millis
-	ui.DeltaMs = ui.FrameStart - ui.LastFrameStart
+	ui.FrameStart = time.Duration(millis*1000*1000)
+	ui.Delta = ui.FrameStart - ui.LastFrameStart
 	ui.Reset()
 	ui.Root = GetNode("root", nil)
 	ui.Root.UpdateFn = rootUpdateFn

@@ -11,6 +11,8 @@ import (
 	"github.com/glupi-borna/soko/internal/globals"
 	"github.com/glupi-borna/soko/internal/sound"
 	"github.com/glupi-borna/soko/internal/player"
+	"github.com/glupi-borna/soko/internal/system"
+	"github.com/glupi-borna/soko/internal/format"
 )
 
 type Widget interface {
@@ -26,8 +28,16 @@ type Widget interface {
 	// Exposes a named value to the widget environment
 	Expose(name string, val any)
 
+	// Gets called once, after the window is created and the UI and other systems
+	// are initialized. Can be called internally for purposes of hotreload & similar.
 	Init()    error
+
+	// Gets called once per frame, between UI.Begin and UI.End. Used for building
+	// the UI and performing logic.
 	Frame()   error
+
+	// Gets called once at application exit. Can be called internally for purposes
+	// of hotreload & similar.
 	Cleanup() error
 }
 
@@ -109,6 +119,8 @@ func ExposeEnvironment(w Widget) {
 	w.Expose("Padding2", ui.Padding2)
 	w.Expose("Tick", ui.Tick)
 	w.Expose("Marquee", ui.Marquee)
-	for key, val := range sound.WidgetFns { w.Expose(key, val) }
-	for key, val := range player.WidgetFns { w.Expose(key, val) }
+	for key, val := range sound.WidgetVars { w.Expose(key, val) }
+	for key, val := range player.WidgetVars { w.Expose(key, val) }
+	for key, val := range system.WidgetVars { w.Expose(key, val) }
+	for key, val := range format.WidgetVars { w.Expose(key, val) }
 }

@@ -22,7 +22,9 @@ var widget_name string
 var no_profile = false
 var profile *bool = &no_profile
 
-var timeout = flag.Uint64("timeout", 0, "stop running after this number of milliseconds (0 = no timeout)")
+var timeout = flag.Uint64(
+	"timeout", 0,
+	"stop running after this number of milliseconds (0 = no timeout)")
 
 var display = flag.Int(
 	"display", 0,
@@ -75,6 +77,13 @@ func main() {
 		window_anchor.Help())
 
 	flag.Parse()
+
+	if flag.NArg() != 1 {
+		println("Widget name not provided!")
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	if DEBUG && *profile {
 		go func() {
 			err := http.ListenAndServe("localhost:6060", nil)
@@ -82,12 +91,6 @@ func main() {
 				println(err.Error())
 			}
 		}()
-	}
-
-	if flag.NArg() != 1 {
-		println("Widget name not provided!")
-		flag.Usage()
-		os.Exit(1)
 	}
 
 	widget_name = flag.Arg(0)
@@ -116,25 +119,16 @@ func main() {
 
 	UI := MakeUI()
 
-	// LastFrameStart := uint64(0)
-	// FrameTime := uint64(0)
-	// count := 0
-	// val := float32(5)
-
 	err = w.Init()
 	Die(err)
-	defer func() {
-		Die(w.Cleanup())
-	}()
+	defer func() { Die(w.Cleanup()) }()
 
 	Platform.Window.Show()
 
 	last_err_text := ""
 
 	for running {
-		FrameStart := sdl.GetTicks64()
-		if *timeout > 0 && FrameStart > *timeout { running = false }
-		if Platform.KeyboardPressed(sdl.SCANCODE_Q) { running = false }
+		if *timeout > 0 && uint64(UI.LastFrameStart.Milliseconds()) > *timeout { running = false }
 
 		ButtonMapUpdate(Platform.Keyboard)
 		ButtonMapUpdate(Platform.Mouse)
@@ -182,11 +176,11 @@ func main() {
 		millis := sdl.GetTicks64()
 
 		UI.Begin(millis); {
+			println("asd")
 			err := w.Frame()
 			if err != nil {
 				if err.Error() != last_err_text {
 					last_err_text = err.Error()
-					println(last_err_text)
 				}
 				UI.Root.Children = nil
 				UI.Current = UI.Root

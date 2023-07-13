@@ -41,7 +41,10 @@ function PlayerStatus()
     return s
 end
 
+local up, down, latency = NET.UpDownLatency(false, true)
+
 function frame()
+    volume = Volume()
     refreshPlayers()
 
     local root = UI().Root
@@ -52,16 +55,26 @@ function frame()
     if title ~= "" then
         for n in With(Row()) do
             n.Size.W = ChildrenSize()
+
             if TextButton(PlayerStatus()) then
                 PlayerPlayPause()
             end
-            Marquee(PlayerTitle(), 15)
+
+            Marquee(title, 15)
             UI().Last.Padding = Padding(8, 4)
         end
     end
 
     Text("Volume")
     UI().Last.Padding = Padding(8, 4)
+
+    Text(Duration(UI().Delta))
+
+    up, down, latency = NET.UpDownLatency(false, Tick(5))
+
+    Text(Bytes(up))
+    Text(Bytes(down))
+    Text(Duration(latency))
 
     local old_vol = volume
     volume = Slider(volume, 0, 1)

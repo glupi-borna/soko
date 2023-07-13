@@ -99,7 +99,7 @@ func ToggleMute() (bool, error) {
 	return pulseClient.ToggleMute()
 }
 
-var WidgetFns = map[string]any{
+var WidgetVars = map[string]any{
 	"Volume": Volume,
 	"SetVolume": SetVolume,
 	"IsMuted": IsMuted,

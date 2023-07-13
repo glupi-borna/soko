@@ -260,7 +260,7 @@ func marqueeRenderFn(n *Node) {
 		total_time_pps := maxoff / speed
 		total_time_ms := uint64(total_time_pps * 1000)
 
-		perc := float64(CurrentUI.FrameStart % total_time_ms) / float64(total_time_ms)
+		perc := float64(uint64(CurrentUI.FrameStart.Milliseconds()) % total_time_ms) / float64(total_time_ms)
 
 		target := sdl.FRect{x, y, float32(w), m.Y}
 		if perc < 0.25 {
