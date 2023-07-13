@@ -46,7 +46,7 @@ var (
 
 	lastPingTime time.Time
 	pingInterval time.Duration = time.Duration(10 * secondsToNanoSeconds)
-	pingAddress = "https://8.8.8.8"
+	pingAddress = "http://1.1.1.1"
 )
 
 func netCountersUpdate(no_ping bool) {

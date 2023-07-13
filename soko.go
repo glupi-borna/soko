@@ -176,7 +176,6 @@ func main() {
 		millis := sdl.GetTicks64()
 
 		UI.Begin(millis); {
-			println("asd")
 			err := w.Frame()
 			if err != nil {
 				if err.Error() != last_err_text {
