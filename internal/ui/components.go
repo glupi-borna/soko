@@ -356,3 +356,20 @@ func VSlider(val, min, max float32) (float32, *Node) {
 	return (perc*diff)+min, n
 }
 
+func imgRenderFn(n *Node) {
+	url := uiGet(n, "url", "")
+	Platform.DrawImage(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y, url)
+}
+
+func Image(url string) *Node {
+	n := CurrentUI.Push("img")
+	defer CurrentUI.Pop(n)
+
+	n.Set("url", url)
+	n.RenderFn = imgRenderFn
+	w, h := Platform.ImageSize(url)
+	n.Size.W = Px(float32(w))
+	n.Size.H = Px(float32(h))
+
+	return n
+}

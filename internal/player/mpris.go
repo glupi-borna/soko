@@ -194,7 +194,7 @@ func (i *Player) GetTrackId() (dbus.ObjectPath, error) { return playerInfo[dbus.
 func (i *Player) GetArtUrl() (string, error) { return playerInfo[string](i, "mpris:artUrl") }
 func (i *Player) GetAlbum() (string, error) { return playerInfo[string](i, "xesam:album") }
 func (i *Player) GetAlbumArtist() (string, error) { return playerInfo[string](i, "xesam:albumArtist") }
-func (i *Player) GetArtist() (string, error) { return playerInfo[string](i, "xesam:artist") }
+func (i *Player) GetArtists() ([]string, error) { return playerInfo[[]string](i, "xesam:artist") }
 func (i *Player) GetLyrics() (string, error) { return playerInfo[string](i, "xesam:asText") }
 func (i *Player) GetBPM() (int, error) { return playerInfo[int](i, "xesam:audioBPM") }
 func (i *Player) GetTitle() (string, error) { return playerInfo[string](i, "xesam:title") }

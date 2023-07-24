@@ -3,6 +3,7 @@ package system
 import (
 	"time"
 	"net/http"
+	"os/exec"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
@@ -111,7 +112,15 @@ var netVars = map[string]any {
 	"UpDownLatency": UpDownLatency,
 }
 
+func Exec(name string, args ...string) (string, error) {
+	cmd := exec.Command(name, args...)
+	stdout, err := cmd.Output()
+	if err != nil { return "", err }
+	return string(stdout), nil
+}
+
 var WidgetVars = map[string]any{
+	"Exec": Exec,
 	"MEM": memVars,
 	"CPU": cpuVars,
 	"DISK": diskVars,

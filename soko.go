@@ -9,6 +9,7 @@ import (
 	"os"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
+	"github.com/veandco/go-sdl2/img"
 	. "github.com/glupi-borna/soko/internal/utils"
 	. "github.com/glupi-borna/soko/internal/platform"
 	. "github.com/glupi-borna/soko/internal/ui"
@@ -108,6 +109,10 @@ func main() {
 	Die(err)
 	defer ttf.Quit()
 
+	err = img.Init(img.INIT_JPG | img.INIT_PNG | img.INIT_WEBP | img.INIT_TIF)
+	Die(err)
+	defer img.Quit()
+
 	running := true
 	Platform.Init(PlatformInitOptions{
 		X: int32(*window_x),
@@ -180,6 +185,7 @@ func main() {
 			if err != nil {
 				if err.Error() != last_err_text {
 					last_err_text = err.Error()
+					println(err.Error())
 				}
 				UI.Root.Children = nil
 				UI.Current = UI.Root

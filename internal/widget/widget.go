@@ -119,6 +119,7 @@ func ExposeEnvironment(w Widget) {
 	w.Expose("Padding2", ui.Padding2)
 	w.Expose("Tick", ui.Tick)
 	w.Expose("Marquee", ui.Marquee)
+	w.Expose("Image", ui.Image)
 	for key, val := range sound.WidgetVars { w.Expose(key, val) }
 	for key, val := range player.WidgetVars { w.Expose(key, val) }
 	for key, val := range system.WidgetVars { w.Expose(key, val) }

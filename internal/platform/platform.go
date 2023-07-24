@@ -155,9 +155,9 @@ func (p *platform) Init(opts PlatformInitOptions) {
 
 	sdl.SetHint("SDL_X11_FORCE_OVERRIDE_REDIRECT", "1")
 	sdl.SetHint(sdl.HINT_FRAMEBUFFER_ACCELERATION, "0")
+	sdl.SetHint(sdl.HINT_RENDER_SCALE_QUALITY, "1")
 	sdl.GLSetAttribute(sdl.GL_MULTISAMPLESAMPLES, 4)
 	sdl.GLSetAttribute(sdl.GL_MULTISAMPLEBUFFERS, 1)
-
 
 	window, err := sdl.CreateShapedWindow(
 		"", 0, 0, 200, 200, window_flags)

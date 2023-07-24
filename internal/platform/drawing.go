@@ -2,7 +2,9 @@ package platform
 
 import (
 	"math"
+	"strings"
 	"github.com/veandco/go-sdl2/sdl"
+	"github.com/veandco/go-sdl2/img"
 	. "github.com/glupi-borna/soko/internal/utils"
 )
 
@@ -150,4 +152,41 @@ func (p *platform) DrawRoundRectFilled(x, y, w, h, r float32) {
 	}
 
 	p.Renderer.RenderGeometry(nil, RRVERTS, nil)
+}
+
+var tex_cache map[string]*sdl.Texture = make(map[string]*sdl.Texture)
+
+func (p *platform) DrawImage(x, y, w, h float32, url string) bool {
+	tex, ok := tex_cache[url]
+	if !ok {
+		realurl := url
+		if strings.HasPrefix(realurl, "file://") {
+			realurl = realurl[7:]
+		}
+
+		tex, err := img.LoadTexture(p.Renderer, realurl)
+		tex_cache[url] = tex
+
+		if err != nil {
+			println(url, err.Error())
+			return false
+		}
+	}
+
+	if tex == nil {
+		return false
+	}
+
+	p.Renderer.CopyF(tex, nil, &sdl.FRect{
+		X: x, Y: y, W: w, H: h,
+	})
+
+	return true
+}
+
+func (p *platform) ImageSize(url string) (int32, int32) {
+	tex, ok := tex_cache[url]
+	if !ok { return 0, 0 }
+	_, _, w, h, _ := tex.Query()
+	return w, h
 }
