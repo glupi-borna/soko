@@ -4,13 +4,13 @@ BASEDIR="$(dirname "${BASH_SOURCE[0]}")"
 cd $BASEDIR/..
 
 function build() {
-    killall soko
+    killall -s TERM soko
     if go build ./soko.go ; then
         ./soko -x -8 -y 25 -anchor top-right test &
     fi
 }
 
-trap 'killall soko ; rm soko ; exit 0' EXIT HUP INT TERM
+trap 'killall -s TERM soko ; rm soko ; exit 0' EXIT HUP INT TERM
 build
 
 inotifywait . --monitor -e modify --include "\.go" -r |

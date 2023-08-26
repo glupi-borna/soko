@@ -1,83 +1,17 @@
 local volume = Volume()
 local players = nil
+local player = nil
 function refreshPlayers()
     if players == nil or Tick(5) then
         local err = nil
+        player = nil
         players, err = Players()
-        if err ~= nil then print(err:Error()) end
+        if err ~= nil then
+            print(err:Error())
+        else
+            if #players > 0 then player = players[1] end
+        end
     end
-end
-
-function GetPlayer()
-    if players == nil then return nil end
-    local len = #players
-    for i=1, len do
-        local p = players[i]
-        local _, err = p:GetPlaybackStatus()
-        if err == nil then return p end
-    end
-    return nil
-end
-
-function PlayerTitle()
-    local p = GetPlayer()
-    if p == nil then return "" end
-    local t, _ = p:GetTitle()
-    return t
-end
-
-function PlayerArtist()
-    local p = GetPlayer()
-    if p == nil then return "" end
-    local a, _ = p:GetArtists()
-    return a[1]
-end
-
-function PlayerPlayPause()
-    local p = GetPlayer()
-    if p == nil then return end
-    p:PlayPause()
-end
-
-function PlayerStatus()
-    local p = GetPlayer()
-    if p == nil then return "" end
-    local s, _ = p:GetPlaybackStatus()
-    return s
-end
-
-function PlayerArtUrl()
-    local p = GetPlayer()
-    if p == nil then return "" end
-    local s, _ = p:GetArtUrl()
-    return s
-end
-
-function PlayerArtUrl()
-    local p = GetPlayer()
-    if p == nil then return "" end
-    local s, _ = p:GetArtUrl()
-    return s
-end
-
-function PlayerVolume()
-    local p = GetPlayer()
-    if p == nil then return "" end
-    local v, _ = p:GetVolume()
-    return v
-end
-
-function PlayerSetVolume(vol)
-    local p = GetPlayer()
-    if p == nil then return "" end
-    p:SetVolume(vol)
-end
-
-function PlayerVolumeSupported()
-    local p = GetPlayer()
-    if p == nil then return "" end
-    local _, err = p:GetVolume()
-    return err == nil
 end
 
 local up, down, latency = NET.UpDownLatency(false, true)
@@ -91,22 +25,43 @@ function frame()
     root.Style.Foreground.Normal = ColHex(0xf8f8f2ff)
     root.Style.Background.Normal = ColHex(0x1B1C2500)
 
-    local title = PlayerTitle()
-    if title ~= "" then
+    local player_volume = nil
+    if player ~= nil then
+        local track = player:GetTrackInfo()
+
+        player_volume, err = player:GetVolume()
+        if err ~= nil then player_volume = nil end
+
         for n in With(Row()) do
-            local img = Image(PlayerArtUrl())
             n.Padding = Padding(0, 0, 0, 8)
-            img.Size.W = Em(4)
-            img.Size.H = Em(4)
             n.Size.W = ChildrenSize()
+            local img = nil
+            local img_size = nil
+
+            if track.ArtUrl ~= "" then
+                img = Image(track.ArtUrl)
+                img_size = Animate(4, "img_size")
+            else
+                img = Invisible(Em(0))
+                img_size = Animate(0, "img_size")
+            end
+
+            img.Size.W = Em(img_size)
+            img.Size.H = Em(img_size)
 
             for n in With(Column()) do
                 n.Padding.Top = 0
+
+                if img_size < 0.5 then
+                    n.Padding.Left = 0
+                end
+
                 n.Size.H = ChildrenSize()
 
-                if TextButton(PlayerStatus()) then
-                    PlayerPlayPause()
+                if TextButton(player:GetPlaybackStatus() or "?") then
+                    player:PlayPause()
                 end
+
                 local button = UI().Last.Parent
                 button.Style = root.Style:Copy()
                 button.Style.Background.Normal = ColHex(0xf1fa8cff)
@@ -114,42 +69,36 @@ function frame()
                 button.Style.Background.Active = ColHex(0xC7D07Aff)
                 button.Style.Foreground.Active = ColHex(0x1B1C2500)
 
-                Marquee(PlayerArtist(), 15).Padding.Top=4
-                UI().Last.Size.W = Em(10)
-                Marquee(title, 15).Padding.Top = 4
-                UI().Last.Size.W = Em(10)
+                local artists = track.Artists
+                local artist = "?"
+                if track.Artists ~= nil and #track.Artists > 0 then
+                    artist = track.Artists[1] or "?"
+                end
+
+                Marquee(artist, 15).Padding.Top=4
+                UI().Last.Size.W = Em(14)
+                Marquee(track.Title or "", 15).Padding.Top = 4
+                UI().Last.Size.W = Em(14)
             end
         end
     end
 
-    local slider = nil
-    if PlayerVolumeSupported() then
-        volume = PlayerVolume()
-        local old_vol = volume
-        volume = Slider(volume, 0, 1)
-        slider = UI().Last
-        if volume ~= old_vol then PlayerSetVolume(volume) end
+    local set_volume = nil
+    if player_volume ~= nil then
+        volume = player_volume
+        set_volume = function(vol) player:SetVolume(vol) end
     else
         volume = Volume()
-        local old_vol = volume
-        volume = Slider(volume, 0, 1)
-        slider = UI().Last
-        if volume ~= old_vol then SetVolume(volume) end
+        set_volume = SetVolume
     end
 
-    slider.Style.CornerRadius.Normal = 0
-    slider.Style.CornerRadius.Active = 0
-    slider.Size.W = Em(16)
-    slider.Size.H = Em(1)
+    local old_vol = volume
+    volume = Slider(volume, 0, 1)
+    if volume ~= old_vol then set_volume(volume) end
 
-    -- Text("Volume")
-    -- UI().Last.Padding = Padding(8, 4)
-
-    -- Text(Duration(UI().Delta))
-
-    -- up, down, latency = NET.UpDownLatency(false, Tick(5))
-
-    -- Text(Bytes(up))
-    -- Text(Bytes(down))
-    -- Text(Duration(latency))
+    if player ~= nil then
+        UI().Last.Size.W = LargestSibling()
+    else
+        UI().Last.Size.W = Em(13)
+    end
 end

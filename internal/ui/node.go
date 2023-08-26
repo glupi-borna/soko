@@ -11,7 +11,7 @@ import (
 type DIM_TYPE uint8
 const (
 	DT_AUTO DIM_TYPE = iota
-	DT_PX ; DT_EM ; DT_FR ; DT_TEXT ; DT_CHILDREN ; DT_SKIP
+	DT_PX ; DT_EM ; DT_FR ; DT_TEXT ; DT_CHILDREN ; DT_LARGEST_SIBLING ; DT_SKIP
 )
 
 type Dimension struct {
@@ -34,6 +34,7 @@ func Px(amount float32) Dimension { return Dimension{Type: DT_PX, Amount: amount
 func Fr(amount float32) Dimension { return Dimension{Type: DT_FR, Amount: amount} }
 func Em(amount float32) Dimension { return Dimension{Type: DT_EM, Amount: amount} }
 func ChildrenSize() Dimension { return Dimension{ Type: DT_CHILDREN }}
+func LargestSibling() Dimension { return Dimension{ Type: DT_LARGEST_SIBLING }}
 func FitText() Dimension { return Dimension{ Type: DT_TEXT }}
 func Auto() Dimension { return Dimension{ Type: DT_AUTO } }
 
@@ -64,6 +65,7 @@ type Node struct {
 	Children  []*Node
 	Style     *Style
 	Padding   PaddingType
+	Text      string
 
 	// Semantic size
 	Size Size
@@ -127,10 +129,6 @@ func MakeNode(t string, parent *Node) *Node {
 	return &n
 }
 
-func (n *Node) Set(key string, val any) bool {
-	return uiDataSet(n, key, val)
-}
-
 func defaultUpdateFn(n *Node) {
 	n.UpdateChildren()
 
@@ -173,7 +171,8 @@ func rootRenderFn(n *Node) {
 	c := n.Style.Background.Normal
 
 	Platform.SetColor(c)
-	Platform.DrawRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+	// Platform.DrawRectFilled(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
+	Platform.Renderer.Clear()
 	Platform.ReshapeWindow(radius, false)
 }
 
@@ -271,8 +270,7 @@ func (n *Node) ResolveStandalone() {
 		n.IsWidthResolved = true
 
 	} else if n.Size.W.Type == DT_TEXT {
-		t := uiGet(n, "text", "")
-		n.RealSize.X = Platform.TextWidth(t) + n.Padding.Left + n.Padding.Right
+		n.RealSize.X = Platform.TextWidth(n.Text) + n.Padding.Left + n.Padding.Right
 		n.IsWidthResolved = true
 	}
 
@@ -285,8 +283,7 @@ func (n *Node) ResolveStandalone() {
 		n.IsHeightResolved = true
 
 	} else if n.Size.H.Type == DT_TEXT {
-		t := uiGet(n, "text", "")
-		n.RealSize.Y = Platform.TextHeight(t) + n.Padding.Top + n.Padding.Bottom
+		n.RealSize.Y = Platform.TextHeight(n.Text) + n.Padding.Top + n.Padding.Bottom
 		n.IsHeightResolved = true
 	}
 
@@ -359,7 +356,18 @@ func (n *Node) ResolveDownwards() {
 	}
 }
 
+func node_width(n *Node) float32 { return n.RealSize.X }
+func node_height(n *Node) float32 { return n.RealSize.Y }
+
 func (n *Node) ResolveViolations() {
+	if n.Size.W.Type == DT_LARGEST_SIBLING {
+		n.RealSize.X = n.Parent.ChildMax(node_width)
+	}
+
+	if n.Size.H.Type == DT_LARGEST_SIBLING {
+		n.RealSize.Y = n.Parent.ChildMax(node_height)
+	}
+
 	var w, h float32
 
 	switch n.Layout {

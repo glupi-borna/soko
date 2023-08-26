@@ -68,7 +68,7 @@ func defaultRenderFn(n *Node) {
 }
 
 func textRenderFn(n *Node) {
-	t := uiGet(n, "text", "")
+	t := n.Text
 	s := n.GetStyle()
 	f := n.GetFont()
 
@@ -87,19 +87,23 @@ func textRenderFn(n *Node) {
 	Platform.DrawText(t, n.Pos.X + n.Padding.Left, n.Pos.Y + n.Padding.Top)
 }
 
+type SliderState struct { Perc float32 }
+
 func hSliderRenderFn(n *Node) {
+	state := NodeState[SliderState](n)
 	s := n.GetStyle()
 	hov := n.Focused()
-	perc := Animate(uiGet[float32](n, "perc", 0.5), n.UID + "-slider-anim")
+	perc := Animate(state.Perc, n.UID + "-slider-anim")
 
 	scaled_size := V2{ X: n.RealSize.X * perc, Y: n.RealSize.Y }
 	if perc < 1 { drawNodeRectBg(n.Pos, n.RealSize, s, hov) }
 	if perc > 0 { drawNodeRect(n.Pos, scaled_size, s.CornerRadius, s.Foreground, StyleVariant[sdl.Color]{}, hov) }}
 
 func vSliderRenderFn(n *Node) {
+	state := NodeState[SliderState](n)
 	s := n.GetStyle()
 	hov := n.Focused()
-	perc := Animate(uiGet[float32](n, "perc", 0.5), n.UID + "-slider-anim")
+	perc := Animate(state.Perc, n.UID + "-slider-anim")
 
 	scaled_size := V2{ X: n.RealSize.X, Y: n.RealSize.Y * perc }
 
@@ -119,10 +123,11 @@ type Number interface {
 }
 
 func hSliderUpdateFn(n *Node) {
+	state := NodeState[SliderState](n)
+
 	if CurrentUI.Mode == IM_MOUSE {
 		if n.UID == n.UI.Hot {
-			new_perc := Clamp((Platform.MousePos.X - n.Pos.X) / n.RealSize.X, 0, 1)
-			n.Set("perc", new_perc)
+			state.Perc = Clamp((Platform.MousePos.X - n.Pos.X) / n.RealSize.X, 0, 1)
 		}
 
 		if n.HasMouse() {
@@ -144,10 +149,11 @@ func hSliderUpdateFn(n *Node) {
 }
 
 func vSliderUpdateFn(n *Node) {
+	state := NodeState[SliderState](n)
+
 	if CurrentUI.Mode == IM_MOUSE {
 		if n.UID == n.UI.Hot {
-			new_perc := 1 - Clamp((Platform.MousePos.Y - n.Pos.Y) / n.RealSize.Y, 0, 1)
-			n.Set("perc", new_perc)
+			state.Perc = 1 - Clamp((Platform.MousePos.Y - n.Pos.Y) / n.RealSize.Y, 0, 1)
 		}
 
 		if n.HasMouse() {
@@ -169,8 +175,6 @@ func vSliderUpdateFn(n *Node) {
 }
 
 func invisibleRenderFn(n *Node) {
-	Platform.SetColor(sdl.Color{255, 0, 0, 255})
-	Platform.DrawRectOutlined(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y)
 }
 
 func WithNode(n *Node, fn func(*Node)) *Node {
@@ -205,7 +209,7 @@ func Text(text string) *Node {
 	n := CurrentUI.Push("text")
 	defer CurrentUI.Pop(n)
 
-	n.Set("text", text)
+	n.Text = text
 	n.Size.W = FitText()
 	n.Size.H = FitText()
 	n.Padding = PaddingType{}
@@ -214,12 +218,16 @@ func Text(text string) *Node {
 	return n
 }
 
+type MarqueeState struct { Speed float32 }
+
 func Marquee(text string, speed float32) *Node {
 	n := CurrentUI.Push("marquee")
 	defer CurrentUI.Pop(n)
 
-	n.Set("text", text)
-	n.Set("speed", speed)
+	state := NodeState[MarqueeState](n)
+
+	n.Text = text
+	state.Speed = speed
 	n.Size.W = Em(8)
 	n.Size.H = Em(1)
 	n.Padding = PaddingType{}
@@ -229,8 +237,9 @@ func Marquee(text string, speed float32) *Node {
 }
 
 func marqueeRenderFn(n *Node) {
-	t := uiGet(n, "text", "")
-	speed := uiGet[float32](n, "speed", 100)
+	state := NodeState[MarqueeState](n)
+	t := n.Text
+	speed := state.Speed
 	s := n.GetStyle()
 	f := n.GetFont()
 
@@ -313,6 +322,7 @@ func Slider(val, min, max float32) (float32, *Node) {
 	n := CurrentUI.Push("hslider")
 	defer CurrentUI.Pop(n)
 
+	state := NodeState[SliderState](n)
 	diff := max - min
 
 	n.Flags.Focusable = true
@@ -324,10 +334,10 @@ func Slider(val, min, max float32) (float32, *Node) {
 
 	var perc float32
 	if n.UID == CurrentUI.Hot {
-		perc = uiGet(n, "perc", perc)
+		perc = state.Perc
 	} else {
 		perc = Clamp(val - min, 0, diff) / diff
-		n.Set("perc", perc)
+		state.Perc = perc
 	}
 
 	return (perc*diff)+min, n
@@ -337,6 +347,7 @@ func VSlider(val, min, max float32) (float32, *Node) {
 	n := CurrentUI.Push("vslider")
 	defer CurrentUI.Pop(n)
 
+	state := NodeState[SliderState](n)
 	diff := max - min
 
 	n.Flags.Focusable = true
@@ -347,17 +358,18 @@ func VSlider(val, min, max float32) (float32, *Node) {
 
 	var perc float32
 	if n.UID == CurrentUI.Hot {
-		perc = uiGet(n, "perc", perc)
+		perc = state.Perc
 	} else {
 		perc = Clamp(val - min, 0, diff) / diff
-		n.Set("perc", perc)
+		state.Perc = perc
 	}
 
 	return (perc*diff)+min, n
 }
 
 func imgRenderFn(n *Node) {
-	url := uiGet(n, "url", "")
+	url := n.Text
+	drawNodeRectBg(n.Pos, n.RealSize, n.GetStyle(), CurrentUI.Active == n.UID)
 	Platform.DrawImage(n.Pos.X, n.Pos.Y, n.RealSize.X, n.RealSize.Y, url)
 }
 
@@ -365,7 +377,7 @@ func Image(url string) *Node {
 	n := CurrentUI.Push("img")
 	defer CurrentUI.Pop(n)
 
-	n.Set("url", url)
+	n.Text = url
 	n.RenderFn = imgRenderFn
 	w, h := Platform.ImageSize(url)
 	n.Size.W = Px(float32(w))

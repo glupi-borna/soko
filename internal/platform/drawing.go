@@ -173,12 +173,26 @@ func (p *platform) DrawImage(x, y, w, h float32, url string) bool {
 		}
 	}
 
-	if tex == nil {
-		return false
+	if tex == nil { return false }
+	_, _, tiw, tih, _ := tex.Query()
+	tw, th := float32(tiw), float32(tih)
+
+	ratio := tw / th
+
+	if tw > w {
+		tw = w
+		th = w / ratio
 	}
 
+	if th > h {
+		th = h
+		tw = h * ratio
+	}
+
+	ox, oy := Max(w-tw, 0)/2, Max(h-th, 0)/2
+
 	p.Renderer.CopyF(tex, nil, &sdl.FRect{
-		X: x, Y: y, W: w, H: h,
+		X: x + ox, Y: y + oy, W: tw, H: th,
 	})
 
 	return true

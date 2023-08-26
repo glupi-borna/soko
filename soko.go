@@ -135,6 +135,13 @@ func main() {
 	for running {
 		if *timeout > 0 && uint64(UI.LastFrameStart.Milliseconds()) > *timeout { running = false }
 
+		if UI != nil && UI.Root != nil {
+			rw, rh := int32(UI.Root.RealSize.X), int32(UI.Root.RealSize.Y)
+			if rw > 0 && rh > 0 {
+				Platform.ResizeWindow(rw, rh)
+			}
+		}
+
 		ButtonMapUpdate(Platform.Keyboard)
 		ButtonMapUpdate(Platform.Mouse)
 		Platform.AnyKeyPressed = false

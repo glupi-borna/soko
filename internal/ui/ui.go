@@ -6,13 +6,11 @@ import (
 	. "github.com/glupi-borna/soko/internal/debug"
 )
 
-type NodeData map[string] any
-
 var CurrentUI *UI_State
 
 func MakeUI() *UI_State {
 	ui := &UI_State{
-		Data: make(map[string]NodeData, 1000),
+		Data: make(map[string]any, 1000),
 		AnimState: make(map[string]float32, 100),
 	}
 	return ui
@@ -41,49 +39,39 @@ func Tick(seconds float64) bool {
 	return last_frame_tick != current_frame_tick || CurrentUI.LastFrameStart == 0
 }
 
-func uiGet[K any](n *Node, key string, dflt K) (out K) {
+// Returns true or false, switching the value it returns every time `seconds` passes
+func Pulse(seconds float64) bool {
 	Assert(CurrentUI != nil, "UI not initialized!")
-
-	data, ok := CurrentUI.Data[n.UID]
-
-	// If node data doesn't exist
-	if !ok {
-		data = make(NodeData)
-		CurrentUI.Data[n.UID] = data
-	}
-
-	// If key does not exist in node data
-	val, ok := data[key]
-	if !ok {
-		data[key] = dflt
-		return dflt
-	}
-
-	// If key is wrong type
-	out, ok = val.(K)
-	if !ok {
-		data[key] = dflt
-		return dflt
-	}
-
-	return out
+	ns := uint64(seconds * 1000 * 1000 * 1000)
+	current_pulse := uint64(CurrentUI.FrameStart) / ns
+	return current_pulse % 2 == 0
 }
 
-// Sets data for this node.
-// Returns true if the data has changed.
-func uiDataSet(n *Node, key string, val any) bool {
+func NodeState[K any](n *Node) *K {
 	Assert(CurrentUI != nil, "UI not initialized!")
+
+	var val K
 
 	data, ok := CurrentUI.Data[n.UID]
 	if !ok {
-		data = make(NodeData)
+		data = &val
 		CurrentUI.Data[n.UID] = data
-		data[key] = val
-		return true
 	}
-	old := data[key]
-	data[key] = val
-	return old != val
+
+	ptr, ok := data.(*K)
+	if !ok {
+		CurrentUI.Data[n.UID] = val
+		ptr = &val
+	}
+
+	return ptr
+}
+
+func NodeStateAny(n *Node) any {
+	Assert(CurrentUI != nil, "UI not initialized!")
+	data, ok := CurrentUI.Data[n.UID]
+	if !ok { return nil }
+	return data
 }
 
 type INPUT_MODE uint8
@@ -96,7 +84,7 @@ const (
 type UI_State struct {
 	Mode INPUT_MODE
 
-	Data map[string]NodeData
+	Data map[string]any
 	AnimState map[string]float32
 
 	Root *Node
@@ -182,13 +170,13 @@ func (ui *UI_State) End() {
 	ui.Root.ResolveViolations()
 	ui.Root.ResolvePos()
 
-	rw, rh := int32(ui.Root.RealSize.X), int32(ui.Root.RealSize.Y)
-	Platform.ResizeWindow(rw, rh)
-
 	if Platform.MouseDelta.ManhattanLength() > 5 { ui.Mode = IM_MOUSE }
 	if Platform.AnyKeyPressed { ui.Mode = IM_KBD }
 
 	ui.Root.UpdateFn(ui.Root)
+
+	// rw, rh := int32(ui.Root.RealSize.X), int32(ui.Root.RealSize.Y)
+	// Platform.ResizeWindow(rw, rh)
 }
 
 func (ui *UI_State) Render() {
