@@ -6,6 +6,7 @@ import (
 	"strconv"
 	. "github.com/glupi-borna/soko/internal/utils"
 	"github.com/glupi-borna/soko/internal/lru"
+	"github.com/glupi-borna/soko/internal/globals"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 )
@@ -145,7 +146,7 @@ func (p *platform) Init(opts PlatformInitOptions) {
 		// NOTE: if this flag is not provided, shaped
 		// windows do not work - presumably because the
 		// window gets recreated.
-		sdl.WINDOW_OPENGL |
+		// sdl.WINDOW_OPENGL |
 		sdl.WINDOW_ALWAYS_ON_TOP
 
 	var renderer_flags uint32 =
@@ -225,7 +226,7 @@ func (p *platform) TargetDisplayBounds() (sdl.Rect, error) {
 	case -1:
 		x, y, _ := sdl.GetGlobalMouseState()
 		displays, err := sdl.GetNumVideoDisplays()
-		return sdl.Rect{}, err
+		if err != nil { return sdl.Rect{}, err }
 		for i:=0 ; i<displays ; i++ {
 			bounds, err := sdl.GetDisplayBounds(i)
 			if err != nil { return sdl.Rect{}, err }
@@ -270,7 +271,7 @@ func (p *platform) ReshapeWindow(radius float32, force bool) {
 	if radius > 0 {
 		pxls := shape.Pixels()
 		rsq := ir*ir
-		bpp := int32(shape.BytesPerPixel())
+		bpp := int32(shape.Format.BytesPerPixel)
 
 		for x := -ir; x < ir ; x++ {
 			xsq := x*x
@@ -304,7 +305,9 @@ func (p *platform) ResizeWindow(width int32, height int32) {
 	ox, oy := p.Window.GetPosition()
 
 	if ox != -1000 && oy != -1000 {
-		if ow == width && oh == height { return }
+		if ow == width && oh == height {
+			return
+		}
 	}
 
 	bounds, err := p.TargetDisplayBounds()
@@ -351,4 +354,9 @@ func (p *platform) TextWidth(text string) float32 {
 
 func (p *platform) TextHeight(text string) float32 {
 	return p.TextMetrics(text).Y
+}
+
+func (p *platform) EndFrame() {
+	globals.FrameCacheClear()
+	p.Renderer.Present()
 }

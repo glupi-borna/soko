@@ -79,3 +79,33 @@ func DbusConn() (*dbus.Conn, error) {
 	}
 	return dbusConn, nil
 }
+
+var frameCache = make(map[string]any, 10)
+
+func FrameCacheClear() {
+	frameCache = make(map[string]any, 10)
+}
+
+func FrameCacheHas(key string) bool {
+	_, ok := frameCache[key]
+	return ok
+}
+
+func FrameCacheGet[K any](key string, def K) K {
+	val, ok := frameCache[key]
+	if !ok {
+		frameCache[key] = def
+		return def
+	}
+
+	kval, ok := val.(K)
+	if !ok {
+		frameCache[key] = def
+		return def
+	}
+	return kval
+}
+
+func FrameCacheSet(key string, val any) {
+	frameCache[key] = val
+}

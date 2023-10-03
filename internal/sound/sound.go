@@ -15,7 +15,15 @@ var pulseClient *pa.Client = nil
 func getDefaultPulseSocket() (string, error) {
 	path := fmt.Sprintf("/run/user/%d/pulse/native", os.Getuid())
 	_, err := os.Stat(path)
-	if err != nil { return path, err }
+	if err == nil { return path, nil }
+
+	xdg_runtime_dir := os.Getenv("XDG_RUNTIME_DIR")
+	if xdg_runtime_dir == "" { return path, err }
+
+	path = fmt.Sprintf("%s/pulse/native", xdg_runtime_dir)
+	_, err = os.Stat(path)
+	if err == nil { return path, nil }
+
 	return path, nil
 }
 
@@ -24,7 +32,7 @@ func getPulseSocket() (string, error) {
 	if err == nil { return def, nil }
 
 	if err != nil {
-		fmt.Println("Pulse: Default socket at", def, "does not exist, falling back to /tmp/")
+		fmt.Println("Pulse: Failed to find socket, falling back to /tmp/")
 	}
 
 	files, err := os.ReadDir("/tmp")

@@ -125,4 +125,5 @@ var WidgetVars = map[string]any{
 	"CPU": cpuVars,
 	"DISK": diskVars,
 	"NET": netVars,
+	"IconPath": GetIconPath,
 }

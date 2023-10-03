@@ -2,6 +2,7 @@ local volume = Volume()
 local players = nil
 local player = nil
 function refreshPlayers()
+    local one, two = Volume()
     if players == nil or Tick(5) then
         local err = nil
         player = nil
@@ -26,19 +27,21 @@ function frame()
     root.Style.Background.Normal = ColHex(0x1B1C2500)
 
     local player_volume = nil
+    local track = nil
     if player ~= nil then
-        local track = player:GetTrackInfo()
-
+        track = player:GetTrackInfo()
         player_volume, err = player:GetVolume()
         if err ~= nil then player_volume = nil end
+    end
 
+    if track ~= nil then
         for n in With(Row()) do
             n.Padding = Padding(0, 0, 0, 8)
             n.Size.W = ChildrenSize()
             local img = nil
             local img_size = nil
 
-            if track.ArtUrl ~= "" then
+            if track.ArtUrl ~= "" and not Pulse(1) then
                 img = Image(track.ArtUrl)
                 img_size = Animate(4, "img_size")
             else
@@ -96,9 +99,11 @@ function frame()
     volume = Slider(volume, 0, 1)
     if volume ~= old_vol then set_volume(volume) end
 
-    if player ~= nil then
+    if track ~= nil then
         UI().Last.Size.W = LargestSibling()
     else
-        UI().Last.Size.W = Em(13)
+        UI().Last.Size.W = Em(13 + Animate(Pulse(1) and 0 or 13, "winwin"))
     end
+
+    Image(IconPath("sound"))
 end

@@ -82,8 +82,19 @@ type Player struct {
 }
 
 func MakePlayer(conn *dbus.Conn, name string) *Player {
+	cacheKey := "MPRISPlayer" + name
+	if globals.FrameCacheHas(cacheKey) {
+		return globals.FrameCacheGet[*Player](cacheKey, nil)
+	}
+
 	obj := conn.Object(name, dbusPath).(*dbus.Object)
-	return &Player{conn, obj, name}
+	player := &Player{conn, obj, name}
+	globals.FrameCacheSet(cacheKey, player)
+	return player
+}
+
+func (i *Player) CacheKey() string {
+	return "MPRISPlayer" + i.name
 }
 
 func (i *Player) Set(prop string, value interface{}) error {
@@ -91,7 +102,15 @@ func (i *Player) Set(prop string, value interface{}) error {
 }
 
 func (i *Player) Get(prop string) (dbus.Variant, error) {
-	return i.obj.GetProperty(mprisPlayer + "." + prop)
+	cacheKey := i.CacheKey() + prop
+	if globals.FrameCacheHas(cacheKey) {
+		return globals.FrameCacheGet(cacheKey, dbus.Variant{}), nil
+	}
+
+	obj, err := i.obj.GetProperty(mprisPlayer + "." + prop)
+	if err == nil { globals.FrameCacheSet(cacheKey, obj) }
+
+	return obj, err
 }
 
 func (i *Player) Call(method string, flags dbus.Flags, args... any) error {
@@ -212,8 +231,6 @@ type TrackInfo struct {
 	Url         string
 }
 
-var track_info_cache = make(map[dbus.ObjectPath]*TrackInfo)
-
 func ignore_err[K any](fn func()(K, error)) K {
 	val, _ := fn()
 	return val
@@ -223,10 +240,7 @@ func (i *Player) GetTrackInfo() (*TrackInfo, error) {
 	track_id, err := i.GetTrackId()
 	if err != nil { return nil, err }
 
-	ti, ok := track_info_cache[track_id]
-	if ok { return ti, nil }
-
-	ti = &TrackInfo{
+	return &TrackInfo{
 		TrackId: track_id,
 		ArtUrl: ignore_err(i.GetArtUrl),
 		Album: ignore_err(i.GetAlbum),
@@ -236,10 +250,7 @@ func (i *Player) GetTrackInfo() (*TrackInfo, error) {
 		BPM: ignore_err(i.GetBPM),
 		Title: ignore_err(i.GetTitle),
 		Url: ignore_err(i.GetUrl),
-	}
-
-	track_info_cache[track_id] = ti
-	return ti, nil
+	}, nil
 }
 
 // Returns the current track position in seconds.

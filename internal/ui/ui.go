@@ -4,6 +4,7 @@ import (
 	"time"
 	. "github.com/glupi-borna/soko/internal/platform"
 	. "github.com/glupi-borna/soko/internal/debug"
+	"math"
 )
 
 var CurrentUI *UI_State
@@ -16,16 +17,21 @@ func MakeUI() *UI_State {
 	return ui
 }
 
+func Interpolate(old, new float32) float32 {
+	dt := (CurrentUI.FrameStart.Seconds() - CurrentUI.LastFrameStart.Seconds())
+	amt := 1 - float32(math.Pow(32, -4*dt))
+	return old + (new - old) * amt
+}
+
 // Smoothly animates a value
 func Animate(val float32, id string) float32 {
 	Assert(CurrentUI != nil, "UI not initialized!")
-
 	old, ok := CurrentUI.AnimState[id]
 	if !ok {
 		CurrentUI.AnimState[id] = val
 		return val
 	}
-	new := old + 0.5 * (val-old)
+	new := Interpolate(old, val)
 	CurrentUI.AnimState[id] = new
 	return new
 }
@@ -44,7 +50,7 @@ func Pulse(seconds float64) bool {
 	Assert(CurrentUI != nil, "UI not initialized!")
 	ns := uint64(seconds * 1000 * 1000 * 1000)
 	current_pulse := uint64(CurrentUI.FrameStart) / ns
-	return current_pulse % 2 == 0
+	return current_pulse % 2 == 1
 }
 
 func NodeState[K any](n *Node) *K {
@@ -87,19 +93,17 @@ type UI_State struct {
 	Data map[string]any
 	AnimState map[string]float32
 
-	Root *Node
-	Current *Node
-	Last *Node
+	Root, Current, Last *Node
 
-	Active string
-	Hot    string
+	Active, Hot string
 
-	ActiveChanged bool
-	HotChanged    bool
+	ActiveChanged, HotChanged bool
 
-	LastFrameStart time.Duration
-	FrameStart time.Duration
-	Delta time.Duration
+	LastFrameStart,
+	FrameStart, Delta time.Duration
+
+	renderWidth,
+	renderHeight float32
 }
 
 func (ui *UI_State) Reset() {
@@ -144,10 +148,14 @@ func (ui *UI_State) SetHot(node *Node, force bool) {
 	ui.HotChanged = true
 }
 
+const TIME_DIV = 1
+
 func (ui *UI_State) Begin(millis uint64) {
 	CurrentUI = ui
+	ui.renderWidth = Platform.WindowWidth()
+	ui.renderHeight = Platform.WindowHeight()
 	ui.LastFrameStart = ui.FrameStart
-	ui.FrameStart = time.Duration(millis*1000*1000)
+	ui.FrameStart = time.Duration(millis*1000*1000/TIME_DIV)
 	ui.Delta = ui.FrameStart - ui.LastFrameStart
 	ui.Reset()
 	ui.Root = GetNode("root", nil)
@@ -174,11 +182,11 @@ func (ui *UI_State) End() {
 	if Platform.AnyKeyPressed { ui.Mode = IM_KBD }
 
 	ui.Root.UpdateFn(ui.Root)
-
-	// rw, rh := int32(ui.Root.RealSize.X), int32(ui.Root.RealSize.Y)
-	// Platform.ResizeWindow(rw, rh)
 }
 
 func (ui *UI_State) Render() {
 	ui.Root.Render()
+	rw, rh := int32(ui.Root.RealSize.X), int32(ui.Root.RealSize.Y)
+	if rw > 0 && rh > 0 { Platform.ResizeWindow(rw, rh) }
+	Platform.EndFrame()
 }
