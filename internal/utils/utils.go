@@ -55,3 +55,25 @@ func ColStr(c sdl.Color) string {
 		strconv.Itoa(int(c.B)) + "," +
 		strconv.Itoa(int(c.A))
 }
+
+func Once[K any](fn func()K) func()K {
+	run := false
+	var result K
+
+	return func()K {
+		if run { return result }
+		run = true
+		result = fn()
+		return result
+	}
+}
+
+func Once1[K any, A comparable](fn func(A)K) func(A)K {
+	results := make(map[A]K)
+	return func(arg A)K {
+		result, ok := results[arg]
+		if ok { return result }
+		results[arg] = fn(arg)
+		return results[arg]
+	}
+}

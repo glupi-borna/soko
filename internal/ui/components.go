@@ -1,6 +1,7 @@
 package ui
 
 import (
+	// "fmt"
 	"golang.org/x/exp/constraints"
 	"github.com/veandco/go-sdl2/sdl"
 	. "github.com/glupi-borna/soko/internal/platform"
@@ -84,7 +85,7 @@ func textRenderFn(n *Node) {
 	drawNodeRectBg(n.Pos, n.RealSize, s, hov)
 	Platform.SetColor(c)
 	Platform.RawSetFont(f)
-	Platform.DrawText(t, n.Pos.X + n.Padding.Left, n.Pos.Y + n.Padding.Top)
+	Platform.DrawText(t, n.Pos.X, n.Pos.Y)
 }
 
 type SliderState struct { Perc float32 }
@@ -254,8 +255,8 @@ func marqueeRenderFn(n *Node) {
 
 	drawNodeRectBg(n.Pos, n.RealSize, s, hov)
 
-	x := n.Pos.X + n.Padding.Left
-	y := n.Pos.Y + n.Padding.Top
+	x := n.Pos.X
+	y := n.Pos.Y
 
 	m := Platform.TextMetrics(t)
 
@@ -265,30 +266,32 @@ func marqueeRenderFn(n *Node) {
 	} else {
 		w := int32(n.RealSize.X)
 		tex := Platform.GetTextTexture(f, t, c)
-		maxoff := m.X - n.RealSize.X
+		_, _, qtw, _, _ := tex.Query()
+		tw := float32(qtw)
+		maxoff := tw - n.RealSize.X
 		total_time_pps := maxoff / speed
-		total_time_ms := uint64(total_time_pps * 1000)
+		total_time_ms := max(uint64(total_time_pps * 1000), 2000)
 
 		perc := float64(uint64(CurrentUI.FrameStart.Milliseconds()) % total_time_ms) / float64(total_time_ms)
+		pperc := Clamp((perc - 0.25) * 2, 0, 1)
+		xoff := int32(pperc * float64(maxoff))
 
-		target := sdl.FRect{x, y, float32(w), m.Y}
-		if perc < 0.25 {
-			Platform.Renderer.CopyF(
-				tex,
-				&sdl.Rect{0, 0, w, int32(m.Y)},
-				&target)
-		} else if perc > 0.75 {
-			Platform.Renderer.CopyF(
-				tex,
-				&sdl.Rect{int32(maxoff), 0, w, int32(m.Y)},
-				&target)
-		} else {
-			pperc := (perc - 0.25) * 2
-			Platform.Renderer.CopyF(
-				tex,
-				&sdl.Rect{int32(pperc * float64(maxoff)), 0, w, int32(m.Y)},
-				&target)
+		width := tw - float32(xoff)
+		// fmt.Println(xoff, maxoff, FloatStr(perc), FloatStr(pperc))
+		// Platform.DrawRectOutlined(x-float32(xoff), y, tw, n.RealSize.Y)
+
+		target := sdl.FRect{
+			X: x, Y: y,
+			W: min(float32(w), width),
+			H: m.Y,
 		}
+
+		source := sdl.Rect{
+			X: xoff, Y: 0,
+			W: min(w, int32(width)), H: int32(m.Y),
+		}
+
+		Platform.Renderer.CopyF(tex, &source, &target)
 	}
 }
 
@@ -305,17 +308,12 @@ func TextButton(text string) bool {
 	return n.Clicked()
 }
 
-func Button(fn func(*Node)) *Node {
+func Button() (*Node, bool) {
 	n := CurrentUI.Push("button")
-	defer CurrentUI.Pop(n)
-
 	n.Flags.Focusable = true
 	n.Style = &ButtonStyle
-	n.Padding = Padding2(8, 4)
-
-	WithNode(n, fn)
-
-	return n
+	n.Padding = Padding2(4, 4)
+	return n, n.Clicked()
 }
 
 func Slider(val, min, max float32) (float32, *Node) {
@@ -354,7 +352,7 @@ func VSlider(val, min, max float32) (float32, *Node) {
 	n.RenderFn = vSliderRenderFn
 	n.UpdateFn = vSliderUpdateFn
 	n.Style = SliderStyle
-	n.Size.W = Px(200)
+	n.Size.H = Px(200)
 
 	var perc float32
 	if n.UID == CurrentUI.Hot {

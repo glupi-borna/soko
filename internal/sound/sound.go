@@ -69,6 +69,12 @@ func pulseInit() error {
 	return nil
 }
 
+func Client() (*pa.Client, error) {
+	err := pulseInit()
+	if err != nil { return nil, err }
+	return pulseClient, nil
+}
+
 // Returns the volume of the default sink in 0-1 range.
 // Values above 1 mean that the volume is above 100%.
 func Volume() (float32, error) {
@@ -108,6 +114,7 @@ func ToggleMute() (bool, error) {
 }
 
 var WidgetVars = map[string]any{
+	"PulseClient": Client,
 	"Volume": Volume,
 	"SetVolume": SetVolume,
 	"IsMuted": IsMuted,

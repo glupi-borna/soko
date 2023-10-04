@@ -116,7 +116,7 @@ func MakeNode(t string, parent *Node) *Node {
 		Parent: parent,
 		RenderFn: defaultRenderFn,
 		UpdateFn: defaultUpdateFn,
-		Padding: Padding1(8),
+		Padding: Padding1(2),
 		UI: CurrentUI,
 	}
 
@@ -197,6 +197,17 @@ func (n *Node) Render() {
 	// println("  sem ", n.Size.String())
 	// println("  res ", n.IsWidthResolved, n.IsHeightResolved)
 
+	debug, ok := Platform.Mouse[sdl.BUTTON_LEFT]
+	if ok && debug == BS_DOWN && n.HasMouse() {
+		pos := n.Pos
+		size := n.RealSize
+		r,g,b,a,_ := Platform.Renderer.GetDrawColor()
+		Platform.Renderer.SetDrawColor(255, 0, 0, 255)
+		Platform.DrawText(n.UID, pos.X, pos.Y+size.Y*0.5)
+		Platform.DrawRectOutlined(pos.X, pos.Y, size.X, size.Y)
+		Platform.Renderer.SetDrawColor(r, g, b, a)
+	}
+
 	n.RenderFn(n)
 	for _, child := range n.Children { child.Render() }
 }
@@ -262,28 +273,28 @@ func (n *Node) ResolveStandalone() {
 	ResolveAuto(n)
 
 	if n.Size.W.Type == DT_PX {
-		n.RealSize.X = n.Size.W.Amount
+		n.RealSize.X = n.Size.W.Amount + n.Padding.XPadding()
 		n.IsWidthResolved = true
 
 	} else if n.Size.W.Type == DT_EM {
-		n.RealSize.X = n.Size.W.Amount * n.GetFont().Height
+		n.RealSize.X = n.Size.W.Amount * n.GetFont().Height + n.Padding.XPadding()
 		n.IsWidthResolved = true
 
 	} else if n.Size.W.Type == DT_TEXT {
-		n.RealSize.X = Platform.TextWidth(n.Text) + n.Padding.Left + n.Padding.Right
+		n.RealSize.X = Platform.TextWidth(n.Text) + n.Padding.XPadding()
 		n.IsWidthResolved = true
 	}
 
 	if n.Size.H.Type == DT_PX {
-		n.RealSize.Y = n.Size.H.Amount
+		n.RealSize.Y = n.Size.H.Amount + n.Padding.YPadding()
 		n.IsHeightResolved = true
 
 	} else if n.Size.H.Type == DT_EM {
-		n.RealSize.Y = n.Size.H.Amount * n.GetFont().Height
+		n.RealSize.Y = n.Size.H.Amount * n.GetFont().Height + n.Padding.YPadding()
 		n.IsHeightResolved = true
 
 	} else if n.Size.H.Type == DT_TEXT {
-		n.RealSize.Y = Platform.TextHeight(n.Text) + n.Padding.Top + n.Padding.Bottom
+		n.RealSize.Y = Platform.TextHeight(n.Text) + n.Padding.YPadding()
 		n.IsHeightResolved = true
 	}
 
@@ -301,7 +312,7 @@ func (n *Node) ResolveUpwards() {
 
 		for _, child := range n.Parent.Children {
 			if child.Size.W.Type == DT_FR {
-				child.RealSize.X = fracw * child.Size.W.Amount
+				child.RealSize.X = fracw * child.Size.W.Amount + child.Padding.XPadding()
 				child.IsWidthResolved = true
 			}
 		}
@@ -314,7 +325,7 @@ func (n *Node) ResolveUpwards() {
 
 		for _, child := range n.Parent.Children {
 			if child.Size.H.Type == DT_FR {
-				child.RealSize.Y = frach * child.Size.H.Amount
+				child.RealSize.Y = frach * child.Size.H.Amount + child.Padding.YPadding()
 				child.IsHeightResolved = true
 			}
 		}
@@ -334,11 +345,11 @@ func (n *Node) ResolveDownwards() {
 	if n.Size.W.Type == DT_CHILDREN {
 		switch n.Layout {
 		case LT_HORIZONTAL:
-			n.RealSize.X = n.ChildSum(nodeRealX) + n.Padding.Left + n.Padding.Right
+			n.RealSize.X = n.ChildSum(nodeRealX) + n.Padding.XPadding()
 			n.IsWidthResolved = true
 
 		case LT_VERTICAL:
-			n.RealSize.X = n.ChildMax(nodeRealX) + n.Padding.Left + n.Padding.Right
+			n.RealSize.X = n.ChildMax(nodeRealX) + n.Padding.XPadding()
 			n.IsWidthResolved = true
 		}
 	}
@@ -346,11 +357,11 @@ func (n *Node) ResolveDownwards() {
 	if n.Size.H.Type == DT_CHILDREN {
 		switch n.Layout {
 		case LT_VERTICAL:
-			n.RealSize.Y = n.ChildSum(nodeRealY) + n.Padding.Top + n.Padding.Bottom
+			n.RealSize.Y = n.ChildSum(nodeRealY) + n.Padding.YPadding()
 			n.IsHeightResolved = true
 
 		case LT_HORIZONTAL:
-			n.RealSize.Y = n.ChildMax(nodeRealY) + n.Padding.Top + n.Padding.Bottom
+			n.RealSize.Y = n.ChildMax(nodeRealY) + n.Padding.YPadding()
 			n.IsHeightResolved = true
 		}
 	}
@@ -361,11 +372,11 @@ func node_height(n *Node) float32 { return n.RealSize.Y }
 
 func (n *Node) ResolveViolations() {
 	if n.Size.W.Type == DT_LARGEST_SIBLING {
-		n.RealSize.X = n.Parent.ChildMax(node_width)
+		n.RealSize.X = n.Parent.ChildMax(node_width) + n.Padding.XPadding()
 	}
 
 	if n.Size.H.Type == DT_LARGEST_SIBLING {
-		n.RealSize.Y = n.Parent.ChildMax(node_height)
+		n.RealSize.Y = n.Parent.ChildMax(node_height) + n.Padding.YPadding()
 	}
 
 	var w, h float32
@@ -500,6 +511,26 @@ func (n *Node) ResolvePos() {
 	if (n.Type == "root") {
 		n.Pos.X = 0
 		n.Pos.Y = 0
+	} else {
+		s := n.GetStyle()
+		if s != nil {
+			switch s.Align {
+			case A_CENTER:
+				switch n.Parent.Layout {
+				case LT_HORIZONTAL:
+					n.Pos.Y = n.Parent.Pos.Y + n.Parent.RealSize.Y*.5 - n.RealSize.Y*.5
+				case LT_VERTICAL:
+					n.Pos.X = n.Parent.Pos.X + n.Parent.RealSize.X*.5 - n.RealSize.X*.5
+				}
+			case A_END:
+				switch n.Parent.Layout {
+				case LT_HORIZONTAL:
+					n.Pos.Y = n.Parent.Pos.Y + n.Parent.RealSize.Y - n.RealSize.Y
+				case LT_VERTICAL:
+					n.Pos.X = n.Parent.Pos.X + n.Parent.RealSize.X - n.RealSize.X
+				}
+			}
+		}
 	}
 
 	var offset float32 = 0

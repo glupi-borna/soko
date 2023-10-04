@@ -123,6 +123,18 @@ func ExposeEnvironment(w Widget) {
 	w.Expose("NodeState", ui.NodeStateAny)
 	w.Expose("Marquee", ui.Marquee)
 	w.Expose("Image", ui.Image)
+
+	w.Expose("AlignStart", ui.A_START)
+	w.Expose("AlignCenter", ui.A_CENTER)
+	w.Expose("AlignEnd", ui.A_END)
+
+	w.Expose("IconButton", func (icon string) bool {
+		btn, val := ui.Button()
+		defer ui.CurrentUI.Pop(btn)
+		ui.Image(system.GetIconPath(icon))
+		return val
+	})
+
 	for key, val := range sound.WidgetVars { w.Expose(key, val) }
 	for key, val := range player.WidgetVars { w.Expose(key, val) }
 	for key, val := range system.WidgetVars { w.Expose(key, val) }

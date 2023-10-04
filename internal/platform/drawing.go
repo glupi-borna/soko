@@ -34,12 +34,12 @@ func (p *platform) DrawText(text string, x, y float32) {
 	c := sdl.Color{r, g, b, a}
 
 	tex := p.GetTextTexture(p.Font, text, c)
-	m := p.TextMetrics(text)
+	_, _, w, h, _ := tex.Query()
 
 	p.Renderer.CopyF(tex, nil, &sdl.FRect{
 		float32(math.Round(float64(x))),
 		float32(math.Round(float64(y))),
-		m.X, m.Y,
+		float32(w), float32(h),
 	})
 }
 

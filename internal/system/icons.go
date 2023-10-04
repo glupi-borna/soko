@@ -6,6 +6,8 @@ import (
 	"path"
 	"os"
 	"strings"
+	. "github.com/glupi-borna/soko/internal/debug"
+	. "github.com/glupi-borna/soko/internal/utils"
 )
 
 func getIconFolder() string {
@@ -21,13 +23,30 @@ func getIconThemeName() string {
 	return strings.Trim(string(out), "'\"\n")
 }
 
+var warnIconNotFound = Once1(func(icon string) bool {
+	fmt.Println("Icon not found: ", icon)
+	fmt.Println("Similar icon names:")
+
+	for k := range icon_index {
+		if strings.Contains(k, icon) {
+			fmt.Println("\t", k)
+		}
+	}
+
+	return true
+})
+
 func GetIconPath(icon string) string {
 	if !icons_indexed {
 		root_path := path.Join(getIconFolder(), getIconThemeName())
 		indexIcons(root_path)
 		icons_indexed = true
 	}
-	return icon_index[icon]
+
+	path, ok := icon_index[icon]
+	if DEBUG && !ok { warnIconNotFound(icon) }
+
+	return path
 }
 
 var icon_index = make(map[string]string)
@@ -46,6 +65,27 @@ func indexIcons(dir_path string) {
 			indexIcons(entry_fullpath)
 			continue
 		}
+
+		if e.Name() == "index.theme" {
+			b, err := os.ReadFile(entry_fullpath)
+			if err != nil { continue }
+
+			lines := strings.Split(string(b), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				before, after, found := strings.Cut(line, "=")
+				if !found { continue }
+				if before != "Inherits" { continue }
+				parts := strings.Split(after, ",")
+				for _, part := range parts {
+					inherited_path := path.Join(getIconFolder(), strings.TrimSpace(part))
+					indexIcons(inherited_path)
+				}
+				break
+			}
+			continue
+		}
+
 		icon_index[name[:len(name) - len(path.Ext(name))]] = entry_fullpath
 	}
 }

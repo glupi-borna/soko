@@ -1,7 +1,16 @@
 package ui
 
 import (
+	"fmt"
 	"github.com/veandco/go-sdl2/sdl"
+)
+
+type ALIGN int
+
+const (
+	A_START ALIGN = iota
+	A_CENTER
+	A_END
 )
 
 type StyleVariant[K any] struct {
@@ -38,6 +47,14 @@ type PaddingType struct {
 	Left, Right, Top, Bottom float32
 }
 
+func (p *PaddingType) XPadding() float32 {
+	return p.Left + p.Right
+}
+
+func (p *PaddingType) YPadding() float32 {
+	return p.Left + p.Right
+}
+
 func Padding1(pad float32) PaddingType {
 	return PaddingType{pad, pad, pad, pad}
 }
@@ -57,7 +74,7 @@ func Padding(args ...float32) PaddingType {
 			Bottom: args[3],
 		}
 	}
-	println("Padding(): unsupported number of arguments:", len(args))
+	fmt.Println("Padding(): unsupported number of arguments:", len(args))
 	return PaddingType{}
 }
 
@@ -67,6 +84,7 @@ type Style struct {
 	Border   	 StyleVariant[sdl.Color]
 	CornerRadius StyleVariant[float32]
 	Padding      PaddingType
+	Align        ALIGN
 	Font         string
 	FontSize     int
 }

@@ -6,8 +6,8 @@ cd $BASEDIR/..
 function build() {
     killall -s TERM soko
     echo Building...
-    if go build ./soko.go ; then
-        ./soko -x -8 -y 25 -anchor top-right test &
+    if go build -tags='debug' ./soko.go ; then
+        ./soko -x -8 -y 25 -anchor top-right -display -1 test &
     fi
 }
 
