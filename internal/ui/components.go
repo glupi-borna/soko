@@ -401,7 +401,9 @@ type Scroller struct {
 }
 
 type ScrollerState struct {
+	TargetOffset V2
 	Offset V2
+	MaxOffset V2
 	ParentClip sdl.Rect
 }
 
@@ -409,6 +411,10 @@ func scrollWindowRenderFn(n *Node) {
 	state := NodeState[ScrollerState](n)
 	state.ParentClip = Platform.Renderer.GetClipRect()
 	rect := n.sdlRect()
+	rect.X += int32(n.Padding.Left)
+	rect.Y += int32(n.Padding.Top)
+	rect.W -= int32(n.Padding.xPadding())
+	rect.H -= int32(n.Padding.yPadding())
 	Platform.Renderer.SetClipRect(&rect)
 }
 
@@ -433,10 +439,15 @@ func scrollWindowUpdateFn(n *Node) {
 
 	state := NodeState[ScrollerState](n)
 
+	state.MaxOffset.X = max(n.Children[0].RealSize.X - n.RealSize.X + n.Padding.xPadding(), 0)
+	state.MaxOffset.Y = max(n.Children[0].RealSize.Y - n.RealSize.Y + n.Padding.yPadding(), 0)
+	state.Offset.X = AnimateSPD(state.TargetOffset.X, 2048, n.UID+"__scrolloffsetx")
+	state.Offset.Y = AnimateSPD(state.TargetOffset.Y, 2048, n.UID+"__scrolloffsety")
+
 	if CurrentUI.Mode == IM_MOUSE {
 		if n.UID == n.UI.ScrollTarget {
-			state.Offset.X += Platform.WheelDelta.X * 10
-			state.Offset.Y += Platform.WheelDelta.Y * 10
+			state.TargetOffset.X = Clamp(state.TargetOffset.X + Platform.WheelDelta.X * 10, -state.MaxOffset.X, 0)
+			state.TargetOffset.Y = Clamp(state.TargetOffset.Y + Platform.WheelDelta.Y * 10, -state.MaxOffset.Y, 0)
 		}
 
 		if n.HasMouse() {

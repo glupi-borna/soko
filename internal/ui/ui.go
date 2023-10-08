@@ -17,23 +17,32 @@ func MakeUI() *UI_State {
 	return ui
 }
 
-func Interpolate(old, new float32) float32 {
+func InterpolateSPD(old, new, spd float32) float32 {
 	dt := (CurrentUI.FrameStart.Seconds() - CurrentUI.LastFrameStart.Seconds())
-	amt := 1 - float32(math.Pow(32, -4*dt))
+	amt := 1 - float32(math.Pow(float64(spd), -4*dt))
 	return old + (new-old)*amt
 }
 
 // Smoothly animates a value
-func Animate(val float32, id string) float32 {
+func AnimateSPD(val, spd float32, id string) float32 {
 	Assert(CurrentUI != nil, "UI not initialized!")
 	old, ok := CurrentUI.AnimState[id]
 	if !ok {
 		CurrentUI.AnimState[id] = val
 		return val
 	}
-	new := Interpolate(old, val)
+	new := InterpolateSPD(old, val, spd)
 	CurrentUI.AnimState[id] = new
 	return new
+}
+
+func Interpolate(old, new float32) float32 {
+	return InterpolateSPD(old, new, 32)
+}
+
+// Smoothly animates a value
+func Animate(val float32, id string) float32 {
+	return AnimateSPD(val, 32, id)
 }
 
 // Returns true approximately every time `seconds` passes
