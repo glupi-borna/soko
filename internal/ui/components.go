@@ -1,11 +1,11 @@
 package ui
 
 import (
-	// "fmt"
-	"golang.org/x/exp/constraints"
-	"github.com/veandco/go-sdl2/sdl"
+	. "github.com/glupi-borna/soko/internal/debug"
 	. "github.com/glupi-borna/soko/internal/platform"
 	. "github.com/glupi-borna/soko/internal/utils"
+	"github.com/veandco/go-sdl2/sdl"
+	"golang.org/x/exp/constraints"
 )
 
 func drawNodeRectBg(pos V2, size V2, s *Style, hovered bool) {
@@ -88,39 +88,47 @@ func textRenderFn(n *Node) {
 	Platform.DrawText(t, n.Pos.X, n.Pos.Y)
 }
 
-type SliderState struct { Perc float32 }
+type SliderState struct{ Perc float32 }
 
 func hSliderRenderFn(n *Node) {
 	state := NodeState[SliderState](n)
 	s := n.GetStyle()
 	hov := n.Focused()
-	perc := Animate(state.Perc, n.UID + "-slider-anim")
+	perc := Animate(state.Perc, n.UID+"-slider-anim")
 
-	scaled_size := V2{ X: n.RealSize.X * perc, Y: n.RealSize.Y }
-	if perc < 1 { drawNodeRectBg(n.Pos, n.RealSize, s, hov) }
-	if perc > 0 { drawNodeRect(n.Pos, scaled_size, s.CornerRadius, s.Foreground, StyleVariant[sdl.Color]{}, hov) }}
+	scaled_size := V2{X: n.RealSize.X * perc, Y: n.RealSize.Y}
+	if perc < 1 {
+		drawNodeRectBg(n.Pos, n.RealSize, s, hov)
+	}
+	if perc > 0 {
+		drawNodeRect(n.Pos, scaled_size, s.CornerRadius, s.Foreground, StyleVariant[sdl.Color]{}, hov)
+	}
+}
 
 func vSliderRenderFn(n *Node) {
 	state := NodeState[SliderState](n)
 	s := n.GetStyle()
 	hov := n.Focused()
-	perc := Animate(state.Perc, n.UID + "-slider-anim")
+	perc := Animate(state.Perc, n.UID+"-slider-anim")
 
-	scaled_size := V2{ X: n.RealSize.X, Y: n.RealSize.Y * perc }
+	scaled_size := V2{X: n.RealSize.X, Y: n.RealSize.Y * perc}
 
-	if perc < 1 { drawNodeRectBg(n.Pos, n.RealSize, s, hov) }
-	if perc > 0 { drawNodeRect(
-		V2{
-			X: n.Pos.X + (n.RealSize.X - scaled_size.X),
-			Y: n.Pos.Y + (n.RealSize.Y - scaled_size.Y),
-		}, scaled_size,
-		s.CornerRadius, s.Foreground,
-		StyleVariant[sdl.Color]{}, hov)
+	if perc < 1 {
+		drawNodeRectBg(n.Pos, n.RealSize, s, hov)
+	}
+	if perc > 0 {
+		drawNodeRect(
+			V2{
+				X: n.Pos.X + (n.RealSize.X - scaled_size.X),
+				Y: n.Pos.Y + (n.RealSize.Y - scaled_size.Y),
+			}, scaled_size,
+			s.CornerRadius, s.Foreground,
+			StyleVariant[sdl.Color]{}, hov)
 	}
 }
 
 type Number interface {
-	constraints.Integer|constraints.Float
+	constraints.Integer | constraints.Float
 }
 
 func hSliderUpdateFn(n *Node) {
@@ -128,13 +136,17 @@ func hSliderUpdateFn(n *Node) {
 
 	if CurrentUI.Mode == IM_MOUSE {
 		if n.UID == n.UI.Hot {
-			state.Perc = Clamp((Platform.MousePos.X - n.Pos.X) / n.RealSize.X, 0, 1)
+			state.Perc = Clamp((Platform.MousePos.X-n.Pos.X)/n.RealSize.X, 0, 1)
 		}
 
 		if n.HasMouse() {
 			CurrentUI.SetActive(n, false)
-			if Platform.MousePressed(sdl.BUTTON_LEFT) { CurrentUI.SetHot(n, false) }
-			if Platform.MouseReleased(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
+			if Platform.MousePressed(sdl.BUTTON_LEFT) {
+				CurrentUI.SetHot(n, false)
+			}
+			if Platform.MouseReleased(sdl.BUTTON_LEFT) {
+				CurrentUI.SetHot(nil, false)
+			}
 		}
 	}
 
@@ -154,13 +166,17 @@ func vSliderUpdateFn(n *Node) {
 
 	if CurrentUI.Mode == IM_MOUSE {
 		if n.UID == n.UI.Hot {
-			state.Perc = 1 - Clamp((Platform.MousePos.Y - n.Pos.Y) / n.RealSize.Y, 0, 1)
+			state.Perc = 1 - Clamp((Platform.MousePos.Y-n.Pos.Y)/n.RealSize.Y, 0, 1)
 		}
 
 		if n.HasMouse() {
 			CurrentUI.SetActive(n, false)
-			if Platform.MousePressed(sdl.BUTTON_LEFT) { CurrentUI.SetHot(n, false) }
-			if Platform.MouseReleased(sdl.BUTTON_LEFT) { CurrentUI.SetHot(nil, false) }
+			if Platform.MousePressed(sdl.BUTTON_LEFT) {
+				CurrentUI.SetHot(n, false)
+			}
+			if Platform.MouseReleased(sdl.BUTTON_LEFT) {
+				CurrentUI.SetHot(nil, false)
+			}
 		}
 	}
 
@@ -173,9 +189,6 @@ func vSliderUpdateFn(n *Node) {
 			}
 		*/
 	}
-}
-
-func invisibleRenderFn(n *Node) {
 }
 
 func WithNode(n *Node, fn func(*Node)) *Node {
@@ -202,7 +215,7 @@ func Invisible(dim Dimension) *Node {
 	n.Size.W = dim
 	n.Size.H = dim
 	n.Padding = PaddingType{}
-	n.RenderFn = invisibleRenderFn
+	n.RenderFn = nil
 	return n
 }
 
@@ -219,7 +232,7 @@ func Text(text string) *Node {
 	return n
 }
 
-type MarqueeState struct { Speed float32 }
+type MarqueeState struct{ Speed float32 }
 
 func Marquee(text string, speed float32) *Node {
 	n := CurrentUI.Push("marquee")
@@ -270,10 +283,10 @@ func marqueeRenderFn(n *Node) {
 		tw := float32(qtw)
 		maxoff := tw - n.RealSize.X
 		total_time_pps := maxoff / speed
-		total_time_ms := max(uint64(total_time_pps * 1000), 2000)
+		total_time_ms := max(uint64(total_time_pps*1000), 2000)
 
-		perc := float64(uint64(CurrentUI.FrameStart.Milliseconds()) % total_time_ms) / float64(total_time_ms)
-		pperc := Clamp((perc - 0.25) * 2, 0, 1)
+		perc := float64(uint64(CurrentUI.FrameStart.Milliseconds())%total_time_ms) / float64(total_time_ms)
+		pperc := Clamp((perc-0.25)*2, 0, 1)
 		xoff := int32(pperc * float64(maxoff))
 
 		width := tw - float32(xoff)
@@ -329,16 +342,15 @@ func Slider(val, min, max float32) (float32, *Node) {
 	n.Style = SliderStyle
 	n.Size.W = Px(200)
 
-
 	var perc float32
 	if n.UID == CurrentUI.Hot {
 		perc = state.Perc
 	} else {
-		perc = Clamp(val - min, 0, diff) / diff
+		perc = Clamp(val-min, 0, diff) / diff
 		state.Perc = perc
 	}
 
-	return (perc*diff)+min, n
+	return (perc * diff) + min, n
 }
 
 func VSlider(val, min, max float32) (float32, *Node) {
@@ -358,11 +370,11 @@ func VSlider(val, min, max float32) (float32, *Node) {
 	if n.UID == CurrentUI.Hot {
 		perc = state.Perc
 	} else {
-		perc = Clamp(val - min, 0, diff) / diff
+		perc = Clamp(val-min, 0, diff) / diff
 		state.Perc = perc
 	}
 
-	return (perc*diff)+min, n
+	return (perc * diff) + min, n
 }
 
 func imgRenderFn(n *Node) {
@@ -382,4 +394,81 @@ func Image(url string) *Node {
 	n.Size.H = Px(float32(h))
 
 	return n
+}
+
+type Scroller struct {
+	Window, View *Node
+}
+
+type ScrollerState struct {
+	Offset V2
+	ParentClip sdl.Rect
+}
+
+func scrollWindowRenderFn(n *Node) {
+	state := NodeState[ScrollerState](n)
+	state.ParentClip = Platform.Renderer.GetClipRect()
+	rect := n.sdlRect()
+	Platform.Renderer.SetClipRect(&rect)
+}
+
+func scrollWindowPostRenderFn(n *Node) {
+	state := NodeState[ScrollerState](n)
+	Platform.Renderer.SetClipRect(&state.ParentClip)
+}
+
+func scrollWindowPreLayout(n *Node) {
+	state := NodeState[ScrollerState](n)
+	Assert(
+		len(n.Children) == 1,
+		"scroll_window must have exactly 1 child node!")
+	Assert(
+		n.Children[0].Type == "scroll_view",
+		"scroll_window must have a scroll_view child!")
+	n.Children[0].Translation = state.Offset
+}
+
+func scrollWindowUpdateFn(n *Node) {
+	n.UpdateChildren()
+
+	state := NodeState[ScrollerState](n)
+
+	if CurrentUI.Mode == IM_MOUSE {
+		if n.UID == n.UI.ScrollTarget {
+			state.Offset.X += Platform.WheelDelta.X * 10
+			state.Offset.Y += Platform.WheelDelta.Y * 10
+		}
+
+		if n.HasMouse() {
+			CurrentUI.SetScrollTarget(n, false)
+		}
+	}
+
+	if CurrentUI.Mode == IM_KBD && CurrentUI.Active == n.UID {
+		// @TODO: Keyboard interaction
+	}
+}
+
+func ScrollBegin() Scroller {
+	var s Scroller
+	s.Window = CurrentUI.Push("scroll_window")
+	s.View = CurrentUI.Push("scroll_view")
+
+	s.Window.Size.W = Px(320)
+	s.Window.Size.H = Px(240)
+	s.Window.RenderFn = scrollWindowRenderFn
+	s.Window.PostRenderFn = scrollWindowPostRenderFn
+	s.Window.UpdateFn = scrollWindowUpdateFn
+	s.Window.PreLayout = scrollWindowPreLayout
+
+	s.View.Size.W = ChildrenSize()
+	s.View.Size.H = ChildrenSize()
+
+	return s
+}
+
+func ScrollEnd() {
+	Assert(CurrentUI.Current.Type == "scroll_view", "Scroll")
+	Assert(CurrentUI.Current.Parent.Type == "scroll_window", "Scroll")
+	CurrentUI.Pop(CurrentUI.Current.Parent)
 }

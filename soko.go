@@ -142,6 +142,8 @@ func main() {
 		Platform.AnyKeyPressed = false
 		Platform.MouseDelta.X = 0
 		Platform.MouseDelta.Y = 0
+		Platform.WheelDelta.X = 0
+		Platform.WheelDelta.Y = 0
 
 		for event := sdl.PollEvent() ; event != nil ; event = sdl.PollEvent() {
 			switch e := event.(type) {
@@ -154,6 +156,10 @@ func main() {
 				}
 				Platform.MousePos.X = float32(e.X)
 				Platform.MousePos.Y = float32(e.Y)
+
+			case *sdl.MouseWheelEvent:
+				Platform.WheelDelta.X += float32(e.X)
+				Platform.WheelDelta.Y += float32(e.Y)
 
 			case *sdl.MouseMotionEvent:
 				Platform.MousePos.X = float32(e.X)

@@ -47,11 +47,11 @@ type PaddingType struct {
 	Left, Right, Top, Bottom float32
 }
 
-func (p *PaddingType) XPadding() float32 {
+func (p *PaddingType) xPadding() float32 {
 	return p.Left + p.Right
 }
 
-func (p *PaddingType) YPadding() float32 {
+func (p *PaddingType) yPadding() float32 {
 	return p.Left + p.Right
 }
 

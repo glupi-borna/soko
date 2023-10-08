@@ -123,6 +123,7 @@ type platform struct {
 	Mouse map[uint8]BUTTON_STATE
 	MousePos V2
 	MouseDelta V2
+	WheelDelta V2
 	Keyboard map[uint32]BUTTON_STATE
 	AnyKeyPressed bool
 

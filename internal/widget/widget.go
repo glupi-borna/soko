@@ -128,6 +128,9 @@ func ExposeEnvironment(w Widget) {
 	w.Expose("AlignCenter", ui.A_CENTER)
 	w.Expose("AlignEnd", ui.A_END)
 
+	w.Expose("ScrollBegin", ui.ScrollBegin)
+	w.Expose("ScrollEnd", ui.ScrollEnd)
+
 	w.Expose("IconButton", func (icon string) bool {
 		btn, val := ui.Button()
 		defer ui.CurrentUI.Pop(btn)

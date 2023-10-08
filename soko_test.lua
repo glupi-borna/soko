@@ -125,4 +125,12 @@ function frame()
 
         SongInfo()
     end
+
+    ScrollBegin()
+        Text("Hello")
+        Text("Hello")
+        Text("Hello")
+        Text("Hello")
+        Text("Hello")
+    ScrollEnd()
 end
